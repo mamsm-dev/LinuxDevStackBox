@@ -90,7 +90,7 @@ fn set_or_append_directive(content: &str, directive: &str, value: &str) -> Strin
         }
     }
     if !found {
-        out.push_str(&format!("\n; DevStackBox import limits\n{directive} = {value}\n"));
+        out.push_str(&format!("\n; LinuxDevStackBox import limits\n{directive} = {value}\n"));
     }
     out
 }
@@ -129,7 +129,7 @@ pub fn apply_recommended_import_limits(content: &str, upload_tmp_dir: Option<&st
     c
 }
 
-/// Migrate only when still on legacy DevStackBox defaults and not yet at import limits v1.
+/// Migrate only when still on legacy defaults and not yet at import limits v1.
 pub fn maybe_migrate_php_import_limits(content: &str, upload_tmp_dir: &str) -> Option<String> {
     if parse_php_import_limits_version(content).unwrap_or(0) >= PHP_IMPORT_LIMITS_VERSION {
         return None;

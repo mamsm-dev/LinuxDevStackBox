@@ -39,6 +39,6 @@ $cfg['MaxNavigationItems'] = 200;
 // Theme
 $cfg['ThemeDefault'] = 'pmahomme';
 $cfg['ThemeManager'] = false;
-if (is_file(__DIR__ . '/devstackbox-theme.inc.php')) {
-    include __DIR__ . '/devstackbox-theme.inc.php';
+if (is_file(__DIR__ . '/linuxdevstackbox-theme.inc.php')) {
+    include __DIR__ . '/linuxdevstackbox-theme.inc.php';
 }

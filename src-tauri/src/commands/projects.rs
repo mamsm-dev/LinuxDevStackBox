@@ -155,7 +155,7 @@ mod tests {
     #[test]
     fn diagnoses_empty_and_missing_roots_without_creating_files() {
         let dir =
-            std::env::temp_dir().join(format!("devstackbox-project-test-{}", std::process::id()));
+            std::env::temp_dir().join(format!("linuxdevstackbox-project-test-{}", std::process::id()));
         fs::create_dir(&dir).unwrap();
         assert!(document_root_message(&dir).unwrap().contains("empty"));
         fs::write(dir.join("index.html"), "hello").unwrap();

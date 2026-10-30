@@ -1,71 +1,100 @@
 // Path resolution helpers.
 //
-// Two distinct roots:
-//   - Installation path: where bundled binaries live (Apache, PHP, MySQL, phpMyAdmin).
-//     Updated by the installer / auto-update; user data must never live here.
-//   - User data root:    where runtime data lives (configs, logs, databases, www).
-//     Default: %LOCALAPPDATA%\devstackbox\ on Windows.
-//     Override: env var `DEVSTACKBOX_DATA_DIR`.
+// Two distinct roots, following the XDG Base Directory Specification:
+//   - Config root ($XDG_CONFIG_HOME/linuxdevstackbox): generated service
+//     configuration the user is expected to edit (httpd.conf, my.cnf, php.ini,
+//     vhost and HTTPS state).
+//   - Data root   ($XDG_DATA_HOME/linuxdevstackbox): mutable runtime data
+//     (logs, MySQL data, www projects, backups, the phpMyAdmin copy).
+// Override both with the `LINUXDEVSTACKBOX_DATA_DIR` environment variable.
+//
+// Server binaries (httpd, mysqld/mariadbd, php, php-cgi and friends) are NOT
+// bundled; they are resolved from the distribution packages described in
+// README.md.
 
 use std::env;
 use std::path::{Path, PathBuf};
+use std::sync::OnceLock;
 
-// Helper function to get the project root directory.
-// Used by a few legacy helpers; prefer get_installation_path or get_user_data_root.
-pub fn get_project_root() -> Result<PathBuf, String> {
-    let current_dir = std::env::current_dir().map_err(|e| e.to_string())?;
-    if current_dir.file_name().and_then(|name| name.to_str()) == Some("src-tauri") {
-        Ok(current_dir.parent().unwrap_or(&current_dir).to_path_buf())
-    } else {
-        Ok(current_dir)
-    }
+pub const APP_ID: &str = "linuxdevstackbox";
+
+fn home_dir() -> PathBuf {
+    // $HOME is set for every interactive Linux session; fall back for safety.
+    env::var_os("HOME")
+        .map(PathBuf::from)
+        .unwrap_or_else(|| PathBuf::from("/tmp"))
 }
 
-// Resolves the install dir that contains apache/, php/, mysql/, phpmyadmin/.
+// Resolves the resource dir that ships static application assets (phpMyAdmin,
+// templates). Debug builds use the repository root; release builds look next
+// to the executable (local builds) and in /usr/lib/linuxdevstackbox (packages).
 pub fn get_installation_path() -> PathBuf {
-    // Release builds resolve only beside their own executable. Never inspect
-    // the launch working directory or borrow another installation's binaries.
     #[cfg(debug_assertions)]
     {
         PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-            .parent().expect("Cargo manifest has a parent").to_path_buf()
+            .parent()
+            .expect("Cargo manifest has a parent")
+            .to_path_buf()
     }
     #[cfg(not(debug_assertions))]
     {
-        env::current_exe().expect("Cannot locate DevStackBox executable")
-            .parent().expect("Executable has a parent").to_path_buf()
+        let exe_dir = env::current_exe()
+            .expect("Cannot locate LinuxDevStackBox executable")
+            .parent()
+            .expect("Executable has a parent")
+            .to_path_buf();
+        let mut candidates = vec![
+            exe_dir.clone(),
+            PathBuf::from("/usr/lib").join(APP_ID),
+            exe_dir
+                .parent()
+                .map(|p| p.join("lib").join(APP_ID))
+                .unwrap_or_else(|| exe_dir.clone()),
+        ];
+        candidates.dedup();
+        candidates
+            .into_iter()
+            .find(|dir| dir.join("phpmyadmin").is_dir())
+            .unwrap_or(exe_dir)
     }
 }
 
 // =====================================================================
-// User Data Root (Roadmap Phase 1.8)
+// XDG user roots
 // =====================================================================
 
 pub fn get_user_data_root() -> PathBuf {
-    if let Ok(custom) = env::var("DEVSTACKBOX_DATA_DIR") {
+    if let Ok(custom) = env::var("LINUXDEVSTACKBOX_DATA_DIR") {
         let p = PathBuf::from(custom);
         let _ = std::fs::create_dir_all(&p);
         return p;
     }
+    let base = env::var_os("XDG_DATA_HOME")
+        .map(PathBuf::from)
+        .filter(|p| p.is_absolute())
+        .unwrap_or_else(|| home_dir().join(".local/share"));
+    let p = base.join(APP_ID);
+    let _ = std::fs::create_dir_all(&p);
+    p
+}
 
-    #[cfg(windows)]
-    {
-        if let Ok(local_appdata) = env::var("LOCALAPPDATA") {
-            let p = PathBuf::from(local_appdata).join("devstackbox");
-            let _ = std::fs::create_dir_all(&p);
-            return p;
-        }
+pub fn get_user_config_root() -> PathBuf {
+    if let Ok(custom) = env::var("LINUXDEVSTACKBOX_DATA_DIR") {
+        let p = PathBuf::from(custom).join("config");
+        let _ = std::fs::create_dir_all(&p);
+        return p;
     }
-
-    let p = get_installation_path().join("data");
+    let base = env::var_os("XDG_CONFIG_HOME")
+        .map(PathBuf::from)
+        .filter(|p| p.is_absolute())
+        .unwrap_or_else(|| home_dir().join(".config"));
+    let p = base.join(APP_ID);
     let _ = std::fs::create_dir_all(&p);
     p
 }
 
 pub fn user_config_dir() -> PathBuf {
-    let p = get_user_data_root().join("config");
-    let _ = std::fs::create_dir_all(&p);
-    p
+    get_user_config_root()
 }
 
 pub fn user_logs_dir() -> PathBuf {
@@ -74,10 +103,10 @@ pub fn user_logs_dir() -> PathBuf {
     p
 }
 
-/// Web root lives inside the install directory so developers can find it easily.
-/// All other mutable data (configs, logs, MySQL data, SSL) remains in LOCALAPPDATA.
+/// Web root lives under the user data root so projects stay writable and
+/// survive package upgrades.
 pub fn user_www_dir() -> PathBuf {
-    let p = get_installation_path().join("www");
+    let p = get_user_data_root().join("www");
     let _ = std::fs::create_dir_all(&p);
     p
 }
@@ -100,19 +129,10 @@ pub fn user_sessions_dir() -> PathBuf {
     p
 }
 
-// Converts a path to a forward-slash string safe for Apache config files.
-//
-// Windows canonicalize() prepends \\?\ (extended-length path prefix) which
-// Apache rejects as a UNC path.  This helper strips that prefix before
-// converting backslashes to forward slashes.
-pub fn to_apache_path(p: &std::path::Path) -> String {
-    let raw = p.to_string_lossy();
-    let stripped = if let Some(s) = raw.strip_prefix(r"\\?\") {
-        s.to_string()
-    } else {
-        raw.into_owned()
-    };
-    stripped.replace('\\', "/")
+/// Converts a path to a forward-slash string safe for Apache config files.
+/// Kept for template compatibility with the generated configuration files.
+pub fn to_apache_path(p: &Path) -> String {
+    p.to_string_lossy().into_owned()
 }
 
 pub fn user_backups_dir() -> PathBuf {
@@ -135,81 +155,321 @@ pub fn ensure_user_data_dirs() {
     let _ = user_backups_dir();
     let _ = user_config_backups_dir();
     println!(
-        "DevStackBox user data root: {}",
+        "LinuxDevStackBox user data root: {}",
         get_user_data_root().display()
     );
 }
 
-// Binary path helpers that work with both the standard layout (bin/ subdirectory)
-// and the flat layout produced by Tauri's NSIS resource bundler (no bin/ subdirectory).
+// =====================================================================
+// phpMyAdmin location
+// =====================================================================
 
-/// Returns the httpd.exe path under the given base install directory.
-/// Checks apache/bin/httpd.exe first (dev / standard), then apache/httpd.exe (flat NSIS install).
-pub fn get_apache_exe(base: &Path) -> PathBuf {
-    let with_bin = base.join("apache").join("bin").join("httpd.exe");
-    if with_bin.exists() {
-        return with_bin;
-    }
-    base.join("apache").join("httpd.exe")
+/// The read-only phpMyAdmin source shipped with the application.
+pub fn phpmyadmin_source_dir() -> PathBuf {
+    get_installation_path().join("phpmyadmin")
 }
 
-/// Returns the mysqld.exe path under the given base install directory.
-/// Checks mysql/bin/mysqld.exe first (dev / standard), then mysql/mysqld.exe (flat NSIS install).
-pub fn get_mysqld_exe(base: &Path) -> PathBuf {
-    let with_bin = base.join("mysql").join("bin").join("mysqld.exe");
-    if with_bin.exists() {
-        return with_bin;
+/// phpMyAdmin needs a writable config.inc.php and temp dirs, which cannot live
+/// under a root-owned install prefix. The bundled copy is therefore cloned
+/// into the user data root on first run; that copy is what Apache serves.
+pub fn phpmyadmin_dir() -> PathBuf {
+    let data_copy = get_user_data_root().join("phpmyadmin");
+    if data_copy.join("index.php").is_file() {
+        return data_copy;
     }
-    base.join("mysql").join("mysqld.exe")
+    let source = phpmyadmin_source_dir();
+    if source.join("index.php").is_file() {
+        return source;
+    }
+    data_copy
 }
 
-/// Returns the mysql.exe client path under the given base install directory.
-/// Checks mysql/bin/mysql.exe first (dev / standard), then mysql/mysql.exe (flat NSIS install).
-pub fn get_mysql_client_exe(base: &Path) -> PathBuf {
-    let with_bin = base.join("mysql").join("bin").join("mysql.exe");
-    if with_bin.exists() {
-        return with_bin;
+/// Clone the bundled phpMyAdmin into the user data root if it is not writable
+/// where it was installed. Returns the directory that should be served.
+pub fn ensure_phpmyadmin_copy() -> Result<PathBuf, String> {
+    let source = phpmyadmin_source_dir();
+    if !source.join("index.php").is_file() {
+        return Err(format!(
+            "phpMyAdmin is not installed at {}. The package may be broken; reinstall linuxdevstackbox.",
+            source.display()
+        ));
     }
-    base.join("mysql").join("mysql.exe")
+    let config_target = source.join("config.inc.php");
+    if is_writable_file(config_target) {
+        return Ok(source);
+    }
+    let target = get_user_data_root().join("phpmyadmin");
+    if !target.join("index.php").is_file() {
+        copy_dir_recursive(&source, &target)?;
+        println!("phpMyAdmin copied to {}", target.display());
+    }
+    Ok(target)
 }
 
-/// Returns the mysql binary directory under the given base install directory.
-/// Returns mysql/bin if mysqld.exe is found there, otherwise mysql/ (flat NSIS install).
-pub fn get_mysql_bin_dir(base: &Path) -> PathBuf {
-    let with_bin = base.join("mysql").join("bin");
-    if with_bin.join("mysqld.exe").exists() {
-        return with_bin;
+fn is_writable_file(path: PathBuf) -> bool {
+    if !path.is_file() {
+        return false;
     }
-    base.join("mysql")
+    std::fs::OpenOptions::new()
+        .append(true)
+        .open(&path)
+        .is_ok()
 }
 
-/// Returns the mysqldump.exe path under the given base install directory.
-/// Checks mysql/bin/mysqldump.exe first (dev / standard), then mysql/mysqldump.exe (flat NSIS install).
-pub fn get_mysqldump_exe(base: &Path) -> PathBuf {
-    let with_bin = base.join("mysql").join("bin").join("mysqldump.exe");
-    if with_bin.exists() {
-        return with_bin;
+fn copy_dir_recursive(source: &Path, target: &Path) -> Result<(), String> {
+    std::fs::create_dir_all(target).map_err(|e| e.to_string())?;
+    for entry in
+        std::fs::read_dir(source).map_err(|e| format!("Cannot read {}: {e}", source.display()))?
+    {
+        let entry = entry.map_err(|e| e.to_string())?;
+        let entry_type = entry.file_type().map_err(|e| e.to_string())?;
+        let dest = target.join(entry.file_name());
+        if entry_type.is_dir() {
+            // Runtime scratch dirs are regenerated by phpMyAdmin itself.
+            if matches!(entry.file_name().to_str(), Some("tmp") | Some("upload") | Some("save")) {
+                std::fs::create_dir_all(&dest).map_err(|e| e.to_string())?;
+                continue;
+            }
+            copy_dir_recursive(&entry.path(), &dest)?;
+        } else {
+            std::fs::copy(entry.path(), &dest).map_err(|e| {
+                format!("Cannot copy {}: {e}", entry.path().display())
+            })?;
+        }
     }
-    base.join("mysql").join("mysqldump.exe")
+    Ok(())
 }
 
-/// Returns the openssl.exe path under the given base install directory.
-/// Checks apache/bin/openssl.exe first (dev / standard), then apache/openssl.exe (flat NSIS install).
-pub fn get_openssl_exe(base: &Path) -> PathBuf {
-    let with_bin = base.join("apache").join("bin").join("openssl.exe");
-    if with_bin.exists() {
-        return with_bin;
+// =====================================================================
+// Distribution binary resolution
+// =====================================================================
+
+const BIN_DIRS: &[&str] = &[
+    "/usr/local/sbin",
+    "/usr/local/bin",
+    "/usr/sbin",
+    "/usr/bin",
+    "/sbin",
+    "/bin",
+];
+
+/// Look a command name up in PATH and the standard binary directories.
+fn which(name: &str) -> Option<PathBuf> {
+    if name.contains('/') {
+        let p = PathBuf::from(name);
+        return p.is_file().then_some(p);
     }
-    base.join("apache").join("openssl.exe")
+    if let Some(path_var) = env::var_os("PATH") {
+        for dir in env::split_paths(&path_var) {
+            let candidate = dir.join(name);
+            if candidate.is_file() {
+                return Some(candidate);
+            }
+        }
+    }
+    BIN_DIRS
+        .iter()
+        .map(|dir| PathBuf::from(dir).join(name))
+        .find(|candidate| candidate.is_file())
 }
 
-/// Shared runtime resolution. Never resolves a PHP binary from PATH.
+fn install_hint(apache: &str, mysql: &str, php: &str) -> String {
+    format!(
+        "Install the distribution packages first:\n\
+         - Arch: sudo pacman -S {apache} {mysql} {php}\n\
+         - Debian/Ubuntu: sudo apt install apache2 mariadb-server php php-cgi\n\
+         - Fedora: sudo dnf install httpd mariadb-server php php-cgi"
+    )
+}
+
+/// Resolve the Apache HTTP server binary (`httpd` on Arch/Fedora,
+/// `apache2` on Debian). Error message lists per-distro install commands.
+pub fn get_apache_binary() -> Result<PathBuf, String> {
+    which("httpd")
+        .or_else(|| which("apache2"))
+        .ok_or_else(|| {
+            format!(
+                "The Apache HTTP server was not found. {}",
+                install_hint("apache", "mariadb", "php php-cgi")
+            )
+        })
+}
+
+/// MariaDB and MySQL share a protocol but differ in tooling and data-dir
+/// initialization. The flavor is decided once, from the server binary name or
+/// its --version banner, and cached for the session.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum MysqlFlavor {
+    MariaDb,
+    MySql,
+}
+
+impl MysqlFlavor {
+    pub fn label(self) -> &'static str {
+        match self {
+            MysqlFlavor::MariaDb => "MariaDB",
+            MysqlFlavor::MySql => "MySQL",
+        }
+    }
+}
+
+fn detect_mysql_flavor(server: &Path) -> MysqlFlavor {
+    let name = server
+        .file_name()
+        .and_then(|n| n.to_str())
+        .unwrap_or_default()
+        .to_ascii_lowercase();
+    if name.contains("mariadb") {
+        return MysqlFlavor::MariaDb;
+    }
+    if let Ok(output) = std::process::Command::new(server)
+        .arg("--version")
+        .output()
+    {
+        if String::from_utf8_lossy(&output.stdout).contains("MariaDB") {
+            return MysqlFlavor::MariaDb;
+        }
+    }
+    MysqlFlavor::MySql
+}
+
+/// Resolve the MySQL/MariaDB server binary and its flavor.
+pub fn get_mysqld_binary() -> Result<(PathBuf, MysqlFlavor), String> {
+    for name in ["mysqld", "mariadbd", "mariadbd-safe"] {
+        if let Some(path) = which(name) {
+            let flavor = detect_mysql_flavor(&path);
+            return Ok((path, flavor));
+        }
+    }
+    Err(format!(
+        "The MySQL/MariaDB server was not found. {}",
+        install_hint("apache", "mariadb", "php php-cgi")
+    ))
+}
+
+fn mysql_flavor() -> MysqlFlavor {
+    static FLAVOR: OnceLock<MysqlFlavor> = OnceLock::new();
+    *FLAVOR.get_or_init(|| match get_mysqld_binary() {
+        Ok((_, flavor)) => flavor,
+        Err(_) => MysqlFlavor::MySql,
+    })
+}
+
+/// Resolve a MySQL client tool by generic and MariaDB-specific names.
+pub fn get_mysql_tool(names: &[&str]) -> Result<PathBuf, String> {
+    names
+        .iter()
+        .find_map(|name| which(name))
+        .ok_or_else(|| {
+            format!(
+                "The {} client tool was not found. {}",
+                names[0],
+                install_hint("apache", "mariadb", "php php-cgi")
+            )
+        })
+}
+
+pub fn get_mysql_client_binary() -> Result<PathBuf, String> {
+    get_mysql_tool(&["mysql", "mariadb"])
+}
+
+pub fn get_mysqldump_binary() -> Result<PathBuf, String> {
+    get_mysql_tool(&["mysqldump", "mariadb-dump"])
+}
+
+pub fn get_mysqladmin_binary() -> Result<PathBuf, String> {
+    get_mysql_tool(&["mysqladmin", "mariadb-admin"])
+}
+
+/// Data-dir initialization tool: MariaDB ships mariadb-install-db, MySQL uses
+/// the server binary itself with --initialize-insecure.
+pub fn get_mysql_install_binary() -> Result<(PathBuf, MysqlFlavor), String> {
+    let flavor = mysql_flavor();
+    if flavor == MysqlFlavor::MariaDb {
+        if let Some(path) = which("mariadb-install-db").or_else(|| which("mysql-install-db")) {
+            return Ok((path, flavor));
+        }
+    }
+    get_mysqld_binary()
+}
+
+/// Resolve the PHP CLI binary.
+pub fn get_php_binary() -> Result<PathBuf, String> {
+    which("php").ok_or_else(|| {
+        format!(
+            "PHP was not found. {}",
+            install_hint("apache", "mariadb", "php")
+        )
+    })
+}
+
+/// Resolve the PHP CGI binary used as the Apache handler.
+pub fn get_php_cgi_binary() -> Result<PathBuf, String> {
+    which("php-cgi").ok_or_else(|| {
+        format!(
+            "php-cgi was not found. {}",
+            install_hint("apache", "mariadb", "php php-cgi")
+        )
+    })
+}
+
+pub fn get_openssl_binary() -> Result<PathBuf, String> {
+    which("openssl").ok_or_else(|| "The openssl command-line tool was not found.".to_string())
+}
+
+// The active PHP installation directory. PHP comes from the distribution, so
+// this is simply the directory that contains the php-cgi binary.
 pub fn active_php_dir() -> PathBuf {
-    let root = get_installation_path().join("php");
-    for candidate in [root.join("current"), root.join("8.3"), root.clone()] {
-        if candidate.join("php.exe").is_file() { return candidate; }
-    }
-    root.join("8.3")
+    get_php_cgi_binary()
+        .ok()
+        .and_then(|p| p.parent().map(Path::to_path_buf))
+        .unwrap_or_else(|| PathBuf::from("/usr/bin"))
 }
 
-pub fn active_php_ini() -> PathBuf { user_config_dir().join("php.ini") }
+/// Directory holding loadable PHP modules (`.so`), as configured in the
+/// distribution PHP build.
+pub fn php_module_dir() -> Result<PathBuf, String> {
+    let php = get_php_binary()?;
+    let output = std::process::Command::new(&php)
+        .args(["-r", "echo ini_get('extension_dir');"])
+        .output()
+        .map_err(|e| format!("Failed to query PHP extension dir: {e}"))?;
+    let dir = String::from_utf8_lossy(&output.stdout).trim().to_string();
+    if output.status.success() && !dir.is_empty() {
+        return Ok(PathBuf::from(dir));
+    }
+    for candidate in [
+        "/usr/lib/php/modules",
+        "/usr/lib64/php/modules",
+        "/usr/lib/php",
+    ] {
+        let p = PathBuf::from(candidate);
+        if p.is_dir() {
+            return Ok(p);
+        }
+    }
+    Err("Could not determine the PHP extension directory.".into())
+}
+
+/// The distribution php.ini template used to seed the user configuration.
+pub fn php_ini_template() -> Option<PathBuf> {
+    [
+        "/etc/php/php.ini",             // Arch
+        "/etc/php.ini",                 // Fedora/RHEL
+        "/etc/php/cgi/php.ini",         // Debian/Ubuntu (CGI SAPI)
+        "/etc/php/8.4/cgi/php.ini",
+        "/etc/php/8.3/cgi/php.ini",
+        "/etc/php/8.2/cgi/php.ini",
+        "/etc/php/cli/php.ini",
+        "/etc/php/8.4/cli/php.ini",
+        "/etc/php/8.3/cli/php.ini",
+        "/etc/php/8.2/cli/php.ini",
+    ]
+    .into_iter()
+    .find(|p| Path::new(p).is_file())
+    .map(PathBuf::from)
+}
+
+pub fn active_php_ini() -> PathBuf {
+    user_config_dir().join("php.ini")
+}

@@ -6,7 +6,7 @@
 // the labels and tooltip in sync with the actual service state.
 //
 // Menu layout:
-//   Show DevStackBox
+//   Show LinuxDevStackBox
 //   ─────────────────
 //   Apache  🟢  Running      ← click to toggle
 //   MySQL   🟢  Running      ← click to toggle
@@ -103,7 +103,7 @@ pub async fn refresh_tray_status(app: &AppHandle) {
 
     // Update tooltip
     let tooltip = format!(
-        "DevStackBox\nApache: {}\nMySQL: {}",
+        "LinuxDevStackBox\nApache: {}\nMySQL: {}",
         if apache_running { "Running" } else { "Stopped" },
         if mysql_running { "Running" } else { "Stopped" },
     );
@@ -136,7 +136,7 @@ fn open_phpmyadmin(app: &AppHandle) {
 pub fn setup_tray(app: &mut App) -> Result<(), Box<dyn std::error::Error>> {
     // Build menu items - start with Stopped labels; the poller will update them
     // within the first second.
-    let show_item = MenuItemBuilder::new("Show DevStackBox")
+    let show_item = MenuItemBuilder::new("Show LinuxDevStackBox")
         .id("show")
         .build(app)?;
 
@@ -186,7 +186,7 @@ pub fn setup_tray(app: &mut App) -> Result<(), Box<dyn std::error::Error>> {
 
     let _tray = TrayIconBuilder::with_id("main")
         .menu(&menu)
-        .tooltip("DevStackBox - PHP Development Environment")
+        .tooltip("LinuxDevStackBox - PHP Development Environment")
         .icon(app.default_window_icon().unwrap().clone())
         .on_menu_event(move |_app, event| {
             let app = _app.clone();

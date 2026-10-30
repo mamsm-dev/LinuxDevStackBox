@@ -7,7 +7,7 @@ use crate::utils::paths::{user_config_backups_dir, user_config_dir};
 // Resolves the editable config file for a service.
 //
 // All four configs (mysql, apache, php, phpmyadmin) are managed in the user
-// config dir (%LOCALAPPDATA%\devstackbox\config\). The PHP config in
+// config dir ($XDG_CONFIG_HOME/linuxdevstackbox/config/). The PHP config in
 // particular MUST be the user copy, because Apache loads php.ini from there
 // via the PHPRC env var and the installation directory's php.ini is kept
 // pristine. Earlier this pointed at php/current/php.ini in the install dir,
@@ -144,20 +144,19 @@ fn snapshot(path: &std::path::Path) -> Result<PathBuf, String> {
 }
 
 fn validate_file(service: &str, path: &std::path::Path) -> Result<(), String> {
-    use crate::utils::paths::{get_installation_path, get_apache_exe, get_mysqld_exe, active_php_dir};
     use crate::utils::process::create_hidden_command;
-    let root = get_installation_path();
     let mut cmd = match service {
         "apache" | "httpd" => {
-            let mut cmd = create_hidden_command(&get_apache_exe(&root).to_string_lossy());
+            let mut cmd = create_hidden_command(crate::utils::paths::get_apache_binary()?.as_os_str());
             cmd.arg("-t").arg("-f").arg(path); cmd
         }
         "mysql" => {
-            let mut cmd = create_hidden_command(&get_mysqld_exe(&root).to_string_lossy());
-            cmd.arg(format!("--defaults-file={}", path.display())).arg("--validate-config"); cmd
+            let (mysqld, _) = crate::utils::paths::get_mysqld_binary()?;
+            let mut cmd = create_hidden_command(mysqld.as_os_str());
+            cmd.arg(format!("--defaults-file={}", path.display())).arg("--help"); cmd
         }
         "php" => {
-            let mut cmd = create_hidden_command(&active_php_dir().join("php.exe").to_string_lossy());
+            let mut cmd = create_hidden_command(crate::utils::paths::get_php_binary()?.as_os_str());
             cmd.arg("-c").arg(path).args(["-r", "echo 'Configuration checked';"]); cmd
         }
         _ => return Err("This configuration cannot be validated independently.".into()),
@@ -176,7 +175,7 @@ mod tests {
     #[test]
     fn rejects_untrusted_backup_names() {
         assert!(valid_backup_name("php.ini_123.bak", "php.ini_"));
-        for name in ["../php.ini_123.bak", "C:\\php.ini_123.bak", "httpd.conf_123.bak", "php.ini_../x.bak"] {
+        for name in ["../php.ini_123.bak", "php.ini_123.bak/x", "httpd.conf_123.bak", "php.ini_../x.bak"] {
             assert!(!valid_backup_name(name, "php.ini_"));
         }
     }

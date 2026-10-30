@@ -282,7 +282,7 @@ mod tests {
     #[test]
     fn sniff_detects_create_database_hint() {
         let dir = std::env::temp_dir().join(format!(
-            "devstackbox-sql-sniff-{}",
+            "linuxdevstackbox-sql-sniff-{}",
             std::process::id()
         ));
         let _ = std::fs::create_dir_all(&dir);

@@ -1,4 +1,4 @@
-//! Shared by the desktop app and the small console PHP launcher. No GUI dependencies.
+//! Shared defaults for the generated per-user php.ini.
 use std::path::Path;
 
 pub const EXTENSIONS: &[&str] = &["mysqli", "pdo_mysql", "pdo_sqlite", "sqlite3", "mbstring", "openssl", "curl", "gd", "zip", "intl", "fileinfo", "exif", "sockets", "sodium"];
@@ -37,14 +37,15 @@ pub fn temporary_defaults(content: &str, tmp: &str) -> String {
 }
 
 /// New profiles only: never re-enable extensions a user disabled in an existing ini.
+/// Linux distributions ship shared modules as `<name>.so` (no php_ prefix).
 pub fn enable_extensions(content: String, ext: &Path) -> String {
     let mut additions = String::new();
     for name in EXTENSIONS {
-        if !ext.join(format!("php_{name}.dll")).is_file() { continue; }
+        if !ext.join(format!("{name}.so")).is_file() { continue; }
         let active = content.lines().filter_map(directive).any(|(key, raw)| {
             let val = value(raw).replace('\\', "/");
             let file = val.rsplit('/').next().unwrap_or("");
-            key.eq_ignore_ascii_case("extension") && (file.eq_ignore_ascii_case(name) || file.eq_ignore_ascii_case(&format!("php_{name}.dll")))
+            key.eq_ignore_ascii_case("extension") && (file.eq_ignore_ascii_case(name) || file.eq_ignore_ascii_case(&format!("{name}.so")))
         });
         if !active { additions.push_str(&format!("extension={name}\n")); }
     }
@@ -65,13 +66,13 @@ mod tests {
         assert_eq!(blank.matches("sys_temp_dir =").count(), 1);
     }
     #[test]
-    fn extension_defaults_match_exact_names_and_quoted_dlls() {
-        let root = std::env::temp_dir().join(format!("dsb-ext-{}", std::process::id()));
+    fn extension_defaults_match_exact_names_and_quoted_modules() {
+        let root = std::env::temp_dir().join(format!("lds-ext-{}", std::process::id()));
         std::fs::create_dir_all(&root).unwrap();
-        for name in ["mysqli", "pdo_sqlite", "sqlite3"] { std::fs::write(root.join(format!("php_{name}.dll")), "").unwrap(); }
-        let original = "extension = \"php_mysqli.dll\" ; enabled\n;extension=pdo_sqlite\n";
+        for name in ["mysqli", "pdo_sqlite", "sqlite3"] { std::fs::write(root.join(format!("{name}.so")), "").unwrap(); }
+        let original = "extension = \"mysqli\" ; enabled\n;extension=pdo_sqlite\n";
         let result = enable_extensions(original.into(), &root);
-        assert_eq!(result.matches("php_mysqli.dll").count(), 1);
+        assert_eq!(result.matches("extension = \"mysqli\" ; enabled").count(), 1);
         assert!(result.contains("extension=pdo_sqlite\n"));
         assert!(result.contains("extension=sqlite3\n"));
         assert!(!result.contains("extension=imagick"));

@@ -1,5 +1,5 @@
 use crate::commands::database_workspace::*;
-// DevStackBox - Tauri application entry point.
+// LinuxDevStackBox - Tauri application entry point.
 //
 // Roadmap Phase 2: this file holds only module declarations and `run()`.
 // All command implementations live in `commands/`; helpers in `utils/`.
@@ -31,8 +31,8 @@ use crate::commands::mysql_import::{
     restore_mysql_from_file,
 };
 use crate::commands::php::{
-    download_php_version, get_php_status, get_php_versions, list_php_extensions,
-    open_php_terminal, switch_php_version, toggle_php, toggle_php_extension,
+    get_php_status, get_php_versions, list_php_extensions, open_php_terminal, toggle_php,
+    toggle_php_extension,
 };
 use crate::commands::system::{
     check_binaries, create_directory_structure, debug_installation, debug_paths, export_diagnostics_bundle,
@@ -52,7 +52,7 @@ use std::sync::Arc;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    println!("Starting DevStackBox application...");
+    println!("Starting LinuxDevStackBox application...");
 
     tauri::Builder::default()
         .manage(Arc::new(TerminalSessions::new()))
@@ -83,8 +83,6 @@ pub fn run() {
             start_apache,
             stop_apache,
             get_php_versions,
-            switch_php_version,
-            download_php_version,
             list_php_extensions,
             toggle_php_extension,
             toggle_mysql,
@@ -178,7 +176,7 @@ pub fn run() {
             import_from_xampp
         ])
         .setup(|app| {
-            println!("DevStackBox setup complete, initializing...");
+            println!("LinuxDevStackBox setup complete, initializing...");
 
             // Roadmap Phase 1.8: ensure user data root and subdirs exist
             // before any service can try to read/write configs or data.

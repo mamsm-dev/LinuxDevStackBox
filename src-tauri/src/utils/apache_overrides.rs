@@ -1,5 +1,5 @@
 //! Safe baseline for directory walking, before site-specific overrides apply.
-pub const BASELINE: &str = "# DevStackBox directory override baseline v1\n<Directory \"/\">\n    AllowOverride None\n    AllowOverrideList None\n</Directory>\n";
+pub const BASELINE: &str = "# LinuxDevStackBox directory override baseline v1\n<Directory \"/\">\n    AllowOverride None\n    AllowOverrideList None\n</Directory>\n";
 
 pub fn with_baseline(content: &str) -> String {
     if content.replace("\r\n", "\n").contains(BASELINE) {
@@ -21,7 +21,7 @@ pub fn migrate(path: &std::path::Path, apache: &std::path::Path) -> Result<(), S
     let backup = path.with_extension(format!("{stamp}.pre-overrides.conf"));
     std::fs::write(&staged, updated).map_err(|e| e.to_string())?;
     let result = (|| {
-        let output = crate::utils::process::create_hidden_command(&apache.to_string_lossy())
+        let output = crate::utils::process::create_hidden_command(apache.as_os_str())
             .arg("-f").arg(&staged).arg("-t").output().map_err(|e| e.to_string())?;
         if !output.status.success() {
             return Err(format!("Apache directory migration rejected; original configuration retained: {}", String::from_utf8_lossy(&output.stderr)));
@@ -42,8 +42,8 @@ mod tests {
         let migrated = with_baseline(original);
         assert!(migrated.ends_with(original));
         assert_eq!(with_baseline(&migrated), migrated);
-        let windows_lines = migrated.replace("\r\n", "\n").replace('\n', "\r\n");
-        assert_eq!(with_baseline(&windows_lines), windows_lines);
+        let crlf_lines = migrated.replace("\n", "\r\n");
+        assert_eq!(with_baseline(&crlf_lines), crlf_lines);
         assert!(migrated.starts_with(BASELINE));
     }
 
@@ -54,7 +54,7 @@ mod tests {
         let file = dir.join("httpd.conf");
         let original = "Listen 127.0.0.1:8080\n# custom config\n";
         std::fs::write(&file, original).unwrap();
-        assert!(migrate(&file, &dir.join("missing-apache.exe")).is_err());
+        assert!(migrate(&file, &dir.join("missing-httpd")).is_err());
         assert_eq!(std::fs::read_to_string(&file).unwrap(), original);
         assert_eq!(std::fs::read_dir(&dir).unwrap().count(), 1);
         std::fs::remove_file(file).unwrap();

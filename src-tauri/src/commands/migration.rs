@@ -8,9 +8,9 @@ use serde::Serialize;
 
 use crate::utils::paths::{get_installation_path, user_www_dir};
 
-const XAMPP_CANDIDATES: &[&str] = &["C:\\xampp", "C:\\XAMPP"];
+const XAMPP_CANDIDATES: &[&str] = &["/opt/lampp"];
 
-// Candidates may differ only in spelling on Windows. Keep the first display path.
+// Keep the first display path when candidates differ only in spelling.
 fn unique_candidates<'a>(candidates: &'a [&'a str]) -> Vec<&'a str> {
     let mut seen = HashSet::new();
     candidates.iter().copied().filter(|candidate| {
@@ -69,10 +69,10 @@ mod detection_tests {
     use super::unique_candidates;
 
     #[test]
-    fn deduplicates_windows_spelling_but_preserves_distinct_installations() {
+    fn equivalent_spelling_deduplicates_but_distinct_roots_do_not() {
         assert_eq!(
-            unique_candidates(&["C:\\xampp", "C:\\XAMPP\\", "c:/xampp/", "D:\\xampp"]),
-            vec!["C:\\xampp", "D:\\xampp"]
+            unique_candidates(&["/opt/lampp", "/opt/lampp/"]),
+            vec!["/opt/lampp"]
         );
     }
 }
@@ -113,7 +113,7 @@ pub fn import_from_xampp(xampp_root: String, copy_htdocs: bool) -> Result<XamppI
     let htdocs = root.join("htdocs");
     let www = user_www_dir();
     if get_installation_path().as_os_str().is_empty() {
-        return Err("DevStackBox installation path is unknown".into());
+        return Err("LinuxDevStackBox installation path is unknown".into());
     }
     let copied = copy_tree(&htdocs, &www)?;
     Ok(XamppImportResult {

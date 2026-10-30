@@ -31,7 +31,7 @@ pub async fn quit_app(app_handle: tauri::AppHandle) -> Result<(), String> {
 //
 // Pushes a fresh tooltip onto the default tray icon. The frontend calls this
 // from its service status poll loop with a short summary string such as
-// "DevStackBox\nApache: Running\nMySQL: Stopped\nPHP: 8.2.12".
+// "LinuxDevStackBox\nApache: Running\nMySQL: Stopped\nPHP: 8.2.12".
 #[tauri::command]
 pub async fn set_tray_tooltip(app_handle: tauri::AppHandle, text: String) -> Result<(), String> {
     let tray_id = TrayIconId::new("main");

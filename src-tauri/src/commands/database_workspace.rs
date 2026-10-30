@@ -362,7 +362,7 @@ fn execute(id: &str, r: &Request, cancel: &Arc<AtomicBool>) -> Result<(), String
         save_history();
     }
     if r.format == "zip" && r.kind != "import" {
-        let path = destination.join(format!("devstackbox-{id}.zip"));
+        let path = destination.join(format!("linuxdevstackbox-{id}.zip"));
         if let Err(error) = write_package(&path, &package_entries, cancel) {
             update(id, |op| {
                 for item in &mut op.items {

@@ -1,356 +1,178 @@
-// Process and executable utilities.
+// Process and executable utilities (Linux).
+//
+// All service discovery reads /proc directly: the exe symlink gives the
+// binary path and cmdline gives the arguments. A service is considered "ours"
+// only when its executable basename matches AND its command line references
+// our generated configuration file, so system Apache/MySQL instances (started
+// by systemd, XAMPP in /opt/lampp, Docker, ...) are never touched.
 
 use std::collections::HashMap;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::process::Command;
 
-// Returns true if the given .exe is 32-bit (PE header IMAGE_FILE_MACHINE_I386).
-#[cfg(windows)]
-pub fn is_32bit_executable(path: &std::path::Path) -> Result<bool, String> {
-    use std::fs::File;
-    use std::io::{Read, Seek, SeekFrom};
-
-    let mut file = File::open(path).map_err(|e| format!("Failed to open file: {e}"))?;
-
-    let mut dos_header = [0u8; 64];
-    file.read_exact(&mut dos_header).map_err(|e| format!("Failed to read DOS header: {e}"))?;
-
-    if &dos_header[0..2] != b"MZ" {
-        return Err("Invalid DOS signature".to_string());
-    }
-
-    let pe_offset = u32::from_le_bytes([dos_header[60], dos_header[61], dos_header[62], dos_header[63]]);
-
-    file.seek(SeekFrom::Start(pe_offset as u64)).map_err(|e| format!("Failed to seek to PE header: {e}"))?;
-
-    let mut pe_header = [0u8; 24];
-    file.read_exact(&mut pe_header).map_err(|e| format!("Failed to read PE header: {e}"))?;
-
-    if &pe_header[0..4] != b"PE\0\0" {
-        return Err("Invalid PE signature".to_string());
-    }
-
-    let machine = u16::from_le_bytes([pe_header[4], pe_header[5]]);
-
-    // 0x014c = IMAGE_FILE_MACHINE_I386 (32-bit)
-    // 0x8664 = IMAGE_FILE_MACHINE_AMD64 (64-bit)
-    Ok(machine == 0x014c)
+pub fn create_hidden_command(program: impl AsRef<std::ffi::OsStr>) -> Command {
+    Command::new(program)
 }
 
-#[cfg(not(windows))]
-pub fn is_32bit_executable(_path: &std::path::Path) -> Result<bool, String> {
-    Ok(false)
-}
-
-// Creates a Command that does not flash a terminal window on Windows.
-pub fn create_hidden_command(program: &str) -> Command {
+/// Creates a service command that runs in its own process group so stop/kill
+/// can address the whole tree (Apache workers, InnoDB helpers) without
+/// touching unrelated processes.
+pub fn create_service_command(program: impl AsRef<std::ffi::OsStr>) -> Command {
+    use std::os::unix::process::CommandExt;
     let mut cmd = Command::new(program);
-
-    #[cfg(windows)]
-    {
-        use std::os::windows::process::CommandExt;
-        cmd.creation_flags(0x08000000); // CREATE_NO_WINDOW
-    }
-
+    cmd.process_group(0);
     cmd
 }
 
-#[cfg(windows)]
-pub fn is_process_running(process_name: &str) -> bool {
-    match create_hidden_command("tasklist")
-        .args(["/FI", &format!("IMAGENAME eq {}", process_name), "/NH"])
-        .output()
-    {
-        Ok(output) => {
-            let output_str = String::from_utf8_lossy(&output.stdout);
-            output_str.contains(process_name)
-                && !output_str.contains("INFO:")
-                && !output_str.contains("No tasks")
-        }
-        Err(_) => false,
-    }
+fn kill_signal(pid: u32, signal: i32, negative: bool) -> bool {
+    let target = if negative { -(pid as i32) } else { pid as i32 };
+    unsafe { libc::kill(target, signal) == 0 }
 }
 
-#[cfg(not(windows))]
-pub fn is_process_running(process_name: &str) -> bool {
-    match Command::new("pgrep")
-        .arg(process_name)
-        .output()
-    {
-        Ok(output) => output.status.success(),
-        Err(_) => false,
+/// Kill a process tree: SIGTERM to the process group, then SIGKILL.
+pub fn kill_pid(pid: u32) -> Result<(), String> {
+    // -pid targets the process group created by create_service_command; when
+    // the process is not a group leader, fall back to the single PID.
+    if kill_signal(pid, libc::SIGTERM, true) || kill_signal(pid, libc::SIGTERM, false) {
+        std::thread::sleep(std::time::Duration::from_millis(300));
     }
-}
-
-#[cfg(windows)]
-pub fn get_process_pid(process_name: &str) -> Option<u32> {
-    match create_hidden_command("tasklist")
-        .args(["/FI", &format!("IMAGENAME eq {}", process_name), "/FO", "CSV", "/NH"])
-        .output()
-    {
-        Ok(output) => {
-            let output_str = String::from_utf8_lossy(&output.stdout);
-            for line in output_str.lines() {
-                if line.contains(process_name) && !line.contains("INFO:") && !line.contains("No tasks") {
-                    let parts: Vec<&str> = line.split(',').collect();
-                    if parts.len() >= 2 {
-                        let pid_str = parts[1].trim_matches('"').trim();
-                        if let Ok(pid) = pid_str.parse::<u32>() {
-                            return Some(pid);
-                        }
-                    }
-                }
-            }
-            None
-        }
-        Err(_) => None,
+    if kill_signal(pid, libc::SIGKILL, true) || kill_signal(pid, libc::SIGKILL, false) {
+        return Ok(());
     }
-}
-
-#[cfg(not(windows))]
-pub fn get_process_pid(process_name: &str) -> Option<u32> {
-    match Command::new("pgrep")
-        .arg(process_name)
-        .output()
-    {
-        Ok(output) => {
-            let output_str = String::from_utf8_lossy(&output.stdout);
-            output_str.trim().parse::<u32>().ok()
-        }
-        Err(_) => None,
+    let errno = std::io::Error::last_os_error();
+    if errno.kind() == std::io::ErrorKind::NotFound {
+        return Ok(());
     }
+    Err(format!("kill failed for pid {pid}: {errno}"))
 }
 
 // =====================================================================
-// Path-aware process lookup
-//
-// `is_process_running` and `get_process_pid` above match by image name only.
-// That is unsafe on a developer machine because XAMPP, WAMP, MAMP, Laragon,
-// or a manual Apache install can have their own `httpd.exe` / `mysqld.exe`
-// running. We must only consider a service "ours" when its executable lives
-// under the DevStackBox installation dir, otherwise Start refuses to run and
-// Stop kills the wrong process.
-//
-// On Windows we use PowerShell + Win32_Process so we get the full
-// `ExecutablePath`. PowerShell is on every supported Windows version (unlike
-// `wmic` which is deprecated and missing on newer Windows 11 builds).
+// /proc scanning
 // =====================================================================
 
-// Returns PIDs grouped by process image name (lowercase), one PowerShell invocation.
-#[cfg(windows)]
+struct ProcEntry {
+    pid: u32,
+    exe: PathBuf,
+    cmdline: String,
+}
+
+/// Read /proc and return every accessible process with its exe path and
+/// command line. Processes of other users (and short-lived kernel threads)
+/// are simply skipped.
+fn scan_processes() -> Vec<ProcEntry> {
+    let mut entries = Vec::new();
+    let Ok(dir) = std::fs::read_dir("/proc") else {
+        return entries;
+    };
+    for entry in dir.flatten() {
+        let file_name = entry.file_name();
+        let Some(name) = file_name.to_str() else { continue };
+        let Ok(pid) = name.parse::<u32>() else { continue };
+        let proc_dir = entry.path();
+        let exe = std::fs::read_link(proc_dir.join("exe")).unwrap_or_default();
+        let cmdline = std::fs::read_to_string(proc_dir.join("cmdline"))
+            .map(|raw| raw.split('\0').filter(|s| !s.is_empty()).collect::<Vec<_>>().join(" "))
+            .unwrap_or_default();
+        if exe.as_os_str().is_empty() && cmdline.is_empty() {
+            continue;
+        }
+        entries.push(ProcEntry { pid, exe, cmdline });
+    }
+    entries
+}
+
+fn image_name(entry: &ProcEntry) -> String {
+    entry
+        .exe
+        .file_name()
+        .and_then(|n| n.to_str())
+        .map(|n| n.to_lowercase())
+        .unwrap_or_default()
+}
+
+fn is_diagnostic_process(image: &str, command_line: &str) -> bool {
+    let tokens: Vec<&str> = command_line.split_whitespace().collect();
+    tokens.iter().skip(1).any(|arg| match image {
+        "httpd" | "apache2" => matches!(*arg, "-v" | "-V" | "-t" | "-S" | "-M" | "-l" | "-L" | "-h" | "-?"),
+        "mysqld" | "mariadbd" => matches!(*arg, "--version" | "-V" | "--help" | "-?" | "--validate-config" | "--initialize" | "--initialize-insecure"),
+        _ => false,
+    })
+}
+
+fn sanitize_image_name(process_name: &str) -> bool {
+    !process_name.is_empty()
+        && process_name
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || c == '.' || c == '_' || c == '-')
+}
+
+// Returns PIDs grouped by process image name (lowercase), one /proc scan.
 pub fn batch_find_processes_by_image(process_names: &[&str]) -> HashMap<String, Vec<(u32, PathBuf)>> {
     let mut map: HashMap<String, Vec<(u32, PathBuf)>> = HashMap::new();
     for name in process_names {
         map.insert(name.to_lowercase(), Vec::new());
     }
-    if process_names.is_empty() {
+    if process_names.is_empty() || process_names.iter().any(|n| !sanitize_image_name(n)) {
         return map;
     }
-
-    for name in process_names {
-        if name.is_empty()
-            || name
-                .chars()
-                .any(|c| !c.is_ascii_alphanumeric() && c != '.' && c != '_' && c != '-')
-        {
-            return map;
-        }
-    }
-
-    let in_list = process_names
-        .iter()
-        .map(|n| format!("'{}'", n))
-        .collect::<Vec<_>>()
-        .join(",");
-
-    let script = format!(
-        "Get-CimInstance Win32_Process | Where-Object {{ $_.Name -in @({in_list}) }} | \
-         ForEach-Object {{ \"$($_.Name)|$($_.ProcessId)|$($_.ExecutablePath)|$($_.CommandLine)\" }}"
-    );
-
-    let output = match create_hidden_command("powershell.exe")
-        .args(["-NoProfile", "-NonInteractive", "-Command", &script])
-        .output()
-    {
-        Ok(o) => o,
-        Err(_) => return map,
-    };
-
-    let stdout = String::from_utf8_lossy(&output.stdout);
-    for line in stdout.lines() {
-        let line = line.trim();
-        if line.is_empty() {
-            continue;
-        }
-        let mut parts = line.splitn(4, '|');
-        let img = parts.next().unwrap_or("").trim().to_lowercase();
-        let pid_str = parts.next().unwrap_or("").trim();
-        let path_str = parts.next().unwrap_or("").trim();
-        let command_line = parts.next().unwrap_or("");
-        if is_diagnostic_process(&img, command_line) { continue; }
-        if let Ok(pid) = pid_str.parse::<u32>() {
-            map.entry(img)
-                .or_default()
-                .push((pid, PathBuf::from(path_str)));
+    for entry in scan_processes() {
+        let image = image_name(&entry);
+        if let Some(bucket) = map.get_mut(&image) {
+            if !is_diagnostic_process(&image, &entry.cmdline) {
+                bucket.push((entry.pid, entry.exe));
+            }
         }
     }
     map
 }
 
-#[cfg(not(windows))]
-pub fn batch_find_processes_by_image(_process_names: &[&str]) -> HashMap<String, Vec<(u32, PathBuf)>> {
-    HashMap::new()
+pub fn find_processes_by_image(process_name: &str) -> Vec<(u32, PathBuf)> {
+    batch_find_processes_by_image(&[process_name])
+        .remove(&process_name.to_lowercase())
+        .unwrap_or_default()
 }
 
-#[cfg(windows)]
-pub fn find_processes_by_image(process_name: &str) -> Vec<(u32, std::path::PathBuf)> {
-    // Sanitize: only allow simple filenames, never anything that could break
-    // out of the single-quoted PowerShell filter string.
-    if process_name.is_empty()
-        || process_name
-            .chars()
-            .any(|c| !c.is_ascii_alphanumeric() && c != '.' && c != '_' && c != '-')
-    {
+pub fn is_process_running(process_name: &str) -> bool {
+    !find_processes_by_image(process_name).is_empty()
+}
+
+pub fn get_process_pid(process_name: &str) -> Option<u32> {
+    find_processes_by_image(process_name).into_iter().map(|(pid, _)| pid).next()
+}
+
+/// Returns true only when a process with the given image name references
+/// `marker` (our generated config path) on its command line. This is the
+/// canonical "is OUR service running?" check.
+pub fn is_our_process_running(process_name: &str, marker: &Path) -> bool {
+    !find_our_processes(process_name, marker).is_empty()
+}
+
+/// Returns the PIDs of `process_name` processes whose command line references
+/// `marker`. Pass the service's generated config file (httpd.conf / my.cnf)
+/// rather than the binary path, because the binary is shared with the system.
+pub fn find_our_processes(process_name: &str, marker: &Path) -> Vec<u32> {
+    if !sanitize_image_name(process_name) {
         return Vec::new();
     }
-
-    let script = format!(
-        "Get-CimInstance Win32_Process -Filter \"Name='{}'\" | \
-         ForEach-Object {{ \"$($_.ProcessId)|$($_.ExecutablePath)\" }}",
-        process_name
-    );
-
-    let output = match create_hidden_command("powershell.exe")
-        .args(["-NoProfile", "-NonInteractive", "-Command", &script])
-        .output()
-    {
-        Ok(o) => o,
-        Err(_) => return Vec::new(),
-    };
-
-    let mut results = Vec::new();
-    let stdout = String::from_utf8_lossy(&output.stdout);
-    for line in stdout.lines() {
-        let line = line.trim();
-        if line.is_empty() {
+    let marker = marker.to_string_lossy().into_owned();
+    let mut pids = Vec::new();
+    for entry in scan_processes() {
+        if image_name(&entry) != process_name.to_lowercase() {
             continue;
         }
-        let mut parts = line.splitn(2, '|');
-        let pid_str = parts.next().unwrap_or("").trim();
-        let path_str = parts.next().unwrap_or("").trim();
-        if let Ok(pid) = pid_str.parse::<u32>() {
-            results.push((pid, std::path::PathBuf::from(path_str)));
+        if !entry.cmdline.contains(&marker) {
+            continue;
         }
+        if is_diagnostic_process(&process_name.to_lowercase(), &entry.cmdline) {
+            continue;
+        }
+        pids.push(entry.pid);
     }
-    results
+    pids
 }
 
-#[cfg(not(windows))]
-pub fn find_processes_by_image(_process_name: &str) -> Vec<(u32, std::path::PathBuf)> {
-    Vec::new()
-}
-
-// Returns true only for processes whose ExecutablePath equals (case-insensitively
-// on Windows) the path we expect. This is the canonical "is OUR service running?"
-// check.
-pub fn is_our_process_running(process_name: &str, expected_path: &std::path::Path) -> bool {
-    !find_our_processes(process_name, expected_path).is_empty()
-}
-
-// Returns the PIDs of processes whose ExecutablePath matches `expected_path`.
-pub fn find_our_processes(process_name: &str, expected_path: &std::path::Path) -> Vec<u32> {
-    let expected = normalize_path(expected_path);
-    let batch = batch_find_processes_by_image(&["httpd.exe", "mysqld.exe"]);
-    let key = process_name.to_lowercase();
-    batch
-        .get(&key)
-        .into_iter()
-        .flat_map(|entries| entries.iter())
-        .filter_map(|(pid, p)| {
-            if normalize_path(p) == expected {
-                Some(*pid)
-            } else {
-                None
-            }
-        })
-        .collect()
-}
-
-// Version/configuration probes use the same executable as the server, but
-// their normal exit must never establish a running-service/crash baseline.
-fn is_diagnostic_process(image: &str, command_line: &str) -> bool {
-    let mut quoted = false;
-    let mut token = String::new();
-    let mut tokens = Vec::new();
-    for ch in command_line.chars() {
-        if ch == '"' { quoted = !quoted; }
-        else if ch.is_whitespace() && !quoted {
-            if !token.is_empty() { tokens.push(std::mem::take(&mut token)); }
-        } else { token.push(ch); }
-    }
-    if !token.is_empty() { tokens.push(token); }
-    tokens.iter().skip(1).any(|arg| match image {
-        "httpd.exe" => matches!(arg.as_str(), "-v" | "-V" | "-t" | "-S" | "-M" | "-l" | "-L" | "-h" | "-?"),
-        "mysqld.exe" => matches!(arg.as_str(), "--version" | "-V" | "--help" | "-?" | "--validate-config" | "--initialize" | "--initialize-insecure"),
-        _ => false,
-    })
-}
-
-fn normalize_path(p: &std::path::Path) -> String {
-    // Canonicalize when possible so junctions / different casings collapse;
-    // fall back to the raw path lowercased.
-    let raw = std::fs::canonicalize(p)
-        .map(|c| c.to_string_lossy().into_owned())
-        .unwrap_or_else(|_| p.to_string_lossy().into_owned());
-    let stripped = raw.strip_prefix(r"\\?\").unwrap_or(&raw).to_string();
-    if cfg!(windows) {
-        stripped.to_lowercase()
-    } else {
-        stripped
-    }
-}
-
-// Kills a single PID. Used instead of `taskkill /IM <name>` so we do not
-// touch processes belonging to other stacks (XAMPP, WAMP, etc.).
-#[cfg(windows)]
-pub fn kill_pid(pid: u32) -> Result<(), String> {
-    let output = create_hidden_command("taskkill")
-        .args(["/F", "/PID", &pid.to_string(), "/T"])
-        .output()
-        .map_err(|e| format!("Failed to execute taskkill: {e}"))?;
-    if output.status.success() {
-        Ok(())
-    } else {
-        Err(format!(
-            "taskkill failed for pid {}: {}",
-            pid,
-            String::from_utf8_lossy(&output.stderr)
-        ))
-    }
-}
-
-#[cfg(not(windows))]
-pub fn kill_pid(pid: u32) -> Result<(), String> {
-    let output = Command::new("kill")
-        .args(["-9", &pid.to_string()])
-        .output()
-        .map_err(|e| format!("Failed to execute kill: {e}"))?;
-    if output.status.success() {
-        Ok(())
-    } else {
-        Err(format!(
-            "kill failed for pid {}: {}",
-            pid,
-            String::from_utf8_lossy(&output.stderr)
-        ))
-    }
-}
-
-// Phase 5.2 - port conflict detection.
-//
-// Returns Ok(()) if `port` on 127.0.0.1 is free; otherwise returns a
-// human-readable error mentioning the service name. We attempt to bind a
-// TCP listener; if the bind fails, the port is considered busy.
+/// Returns Ok(()) if `port` on 127.0.0.1 is free; otherwise returns a
+/// human-readable error mentioning the service name.
 pub fn ensure_port_available(port: u16, service: &str) -> Result<(), String> {
     use std::net::{Ipv4Addr, SocketAddrV4, TcpListener};
 
@@ -363,32 +185,46 @@ pub fn ensure_port_available(port: u16, service: &str) -> Result<(), String> {
         }
         Err(e) => Err(format!(
             "Port {port} is already in use, so {service} cannot start. \
-             Close the program holding that port (often IIS, Skype, another \
-             web server, or a previous DevStackBox instance) and try again. \
-             Underlying error: {e}"
+             Close the program holding that port (often a system Apache or \
+             MySQL service, Docker, or a previous LinuxDevStackBox instance) \
+             and try again. Underlying error: {e}"
         )),
     }
 }
 
+/// True when a TCP port accepts connections on 127.0.0.1.
+pub fn is_port_listening(port: u16) -> bool {
+    use std::net::{Ipv4Addr, SocketAddrV4, TcpStream};
+    let addr = SocketAddrV4::new(Ipv4Addr::LOCALHOST, port);
+    TcpStream::connect_timeout(&addr.into(), std::time::Duration::from_millis(250)).is_ok()
+}
+
 #[cfg(test)]
 mod service_probe_tests {
-    use super::is_diagnostic_process;
+    use super::{is_diagnostic_process, sanitize_image_name};
 
     #[test]
     fn probes_are_not_servers() {
         for flag in ["-v", "-V", "-t", "-S", "-M"] {
-            assert!(is_diagnostic_process("httpd.exe", &format!("\"C:\\Program Files\\Apache\\httpd.exe\" {flag}")));
+            assert!(is_diagnostic_process("httpd", &format!("/usr/bin/httpd {flag}")));
         }
         for flag in ["--version", "--help", "--initialize-insecure", "--validate-config"] {
-            assert!(is_diagnostic_process("mysqld.exe", &format!("mysqld.exe {flag}")));
+            assert!(is_diagnostic_process("mariadbd", &format!("mariadbd {flag}")));
         }
     }
 
     #[test]
     fn real_servers_and_quoted_paths_remain_visible() {
-        assert!(!is_diagnostic_process("httpd.exe", "httpd.exe -d C:/apache -f \"C:/config -v/httpd.conf\""));
-        assert!(!is_diagnostic_process("httpd.exe", "httpd.exe -k runservice"));
-        assert!(!is_diagnostic_process("mysqld.exe", "mysqld.exe --defaults-file=C:/config/my.ini --console"));
-        assert!(!is_diagnostic_process("httpd.exe", ""));
+        assert!(!is_diagnostic_process("httpd", "httpd -DFOREGROUND -f /etc/linuxdevstackbox/httpd.conf"));
+        assert!(!is_diagnostic_process("mariadbd", "mariadbd --defaults-file=/home/u/.config/linuxdevstackbox/my.cnf"));
+        assert!(!is_diagnostic_process("httpd", ""));
+    }
+
+    #[test]
+    fn image_names_are_sanitized() {
+        assert!(sanitize_image_name("httpd"));
+        assert!(sanitize_image_name("mariadbd"));
+        assert!(!sanitize_image_name(""));
+        assert!(!sanitize_image_name("httpd; rm -rf /"));
     }
 }

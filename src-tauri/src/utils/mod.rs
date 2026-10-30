@@ -1,4 +1,4 @@
-// Utility modules for DevStackBox.
+// Utility modules for LinuxDevStackBox.
 // Roadmap Phase 2: extracted from monolithic lib.rs.
 
 pub mod app_settings;

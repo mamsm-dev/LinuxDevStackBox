@@ -1,8 +1,8 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "DevStackBox",
+  "productName": "LinuxDevStackBox",
   "version": "0.1.22",
-  "identifier": "com.srapsware.devstackbox",
+  "identifier": "com.mam.linuxdevstackbox",
   "build": {
     "beforeDevCommand": "npm run dev",
     "beforeBuildCommand": "npm run build",
@@ -13,7 +13,7 @@
     "withGlobalTauri": true,
     "windows": [
       {
-        "title": "DevStackBox",
+        "title": "LinuxDevStackBox",
         "width": 1200,
         "height": 800,
         "resizable": true,
@@ -29,63 +29,48 @@
   },
   "bundle": {
     "active": true,
-    "createUpdaterArtifacts": true,
+    "createUpdaterArtifacts": false,
     "targets": [
-      "nsis"
+      "deb",
+      "rpm"
     ],
-    "publisher": "Nomad Programmer",
+    "publisher": "MAM",
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",
       "icons/128x128@2x.png",
-      "icons/icon.icns",
-      "icons/icon.ico"
+      "icons/icon.png"
     ],
     "resources": {
-      "../apache": "apache",
-      "../mysql": "mysql",
-      "../php/8.3": "php/8.3",
-      "../packaging/phpmyadmin-runtime": "phpmyadmin",
-      "../www": "www",
-      "../tools/mkcert": "tools/mkcert",
-      "../packaging/php-cli": "bin"
+      "../packaging/phpmyadmin-runtime": "phpmyadmin"
     },
     "externalBin": [],
-    "copyright": "\u00a9 2026 Nomad Programmer",
-    "category": "DeveloperTool",
-    "shortDescription": "Local PHP development environment",
-    "longDescription": "Free XAMPP alternative for Windows: Apache, MySQL 8.4 LTS, phpMyAdmin, PHP 8.3 bundled; PHP 8.2-8.5 on demand.",
-    "windows": {
-      "certificateThumbprint": null,
-      "digestAlgorithm": "sha256",
-      "timestampUrl": "",
-      "webviewInstallMode": {
-        "type": "downloadBootstrapper"
-      },
-      "wix": {
-        "language": "en-US",
-        "fragmentPaths": [
-          "wix/custom-install-dir.wxs"
+    "copyright": "© 2026 MAM",
+    "category": "Development",
+    "shortDescription": "Local PHP development environment for Linux",
+    "longDescription": "LinuxDevStackBox is a local PHP development environment for Linux: it manages Apache, MySQL/MariaDB, PHP and phpMyAdmin from distribution packages with per-user configuration, virtual hosts, trusted local HTTPS, database tooling and an integrated terminal.",
+    "linux": {
+      "deb": {
+        "depends": [
+          "apache2",
+          "mariadb-server",
+          "php",
+          "php-cgi",
+          "libnss3-tools",
+          "openssl",
+          "policykit-1"
         ]
       },
-      "nsis": {
-        "template": "templates/installer.nsi",
-        "installMode": "perMachine",
-        "installerHooks": "nsis/hooks.nsh",
-        "displayLanguageSelector": false,
-        "installerIcon": "icons/icon.ico",
-        "languages": [
-          "English"
+      "rpm": {
+        "depends": [
+          "httpd",
+          "mariadb-server",
+          "php",
+          "php-cgi",
+          "openssl",
+          "polkit"
         ]
       }
-    }
-  },
-  "plugins": {
-    "updater": {
-      "endpoints": [
-        "https://github.com/DevStackBox/DevStackBox/releases/latest/download/latest.json"
-      ],
-      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDVBNEMzNDE0OTNDNERGMzUKUldRMTM4U1RGRFJNV2t6K2swazFJb0pGVU5iRDQxYU02NzVOZFN4UnVLVHJQa1dveW0zU3pXY3oK"
     }
   }
 }

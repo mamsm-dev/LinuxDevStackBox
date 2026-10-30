@@ -12,7 +12,7 @@ use tauri::Emitter;
 use zip::write::SimpleFileOptions;
 
 use crate::utils::mysql_connection::{mysqldump_command, mysql_command, prepare_mysql_client};
-use crate::utils::paths::{get_installation_path, get_mysqld_exe, user_backups_dir, user_config_dir, user_www_dir};
+use crate::utils::paths::{user_backups_dir, user_config_dir, user_www_dir};
 use crate::utils::process::is_our_process_running;
 
 // -------------------------------------------------------------------------
@@ -84,10 +84,6 @@ fn collect_files(dir: &Path, prefix: &str, out: &mut Vec<(String, PathBuf)>) -> 
         // not recoverable configuration, and must be skipped before opening it.
         if is_operation_lock(&zip_name) { continue; }
         let meta = std::fs::symlink_metadata(&path).map_err(|e| e.to_string())?;
-        #[cfg(windows)]
-        { use std::os::windows::fs::MetadataExt;
-          if meta.file_attributes() & 0x400 != 0 { return Err(format!("Linked folder/file requires a separate backup: {}", path.display())); }
-        }
         // Private local CAs are machine/account credentials, not portable project data.
         if zip_name == "config/ssl" || zip_name == "config/https" { continue; }
         if meta.is_dir() { collect_files(&path, &zip_name, out)?; }
@@ -147,9 +143,9 @@ pub async fn create_full_backup(
         return Err("Invalid timestamp".to_string());
     }
 
-    // Replace colons (invalid in filenames on Windows) with hyphens
+    // Colons in timestamps are replaced with hyphens for friendlier filenames.
     let safe_ts = timestamp.replace(':', "-");
-    let filename = format!("devstackbox-backup-{}.zip", safe_ts);
+    let filename = format!("linuxdevstackbox-backup-{}.zip", safe_ts);
     let final_path = full_backups_dir().join(&filename);
     let zip_path = final_path.with_extension("partial");
 
@@ -182,10 +178,9 @@ pub async fn create_full_backup(
 
     // --- mysql/all-databases.sql ----------------------------------------
     emit(&app, "mysql", 70, "Backing up MySQL databases...");
-    let base = get_installation_path();
-    let mysqld = get_mysqld_exe(&base);
+    let mysqld = crate::utils::paths::user_config_dir().join("my.cnf");
     let mut mysql_included = false;
-    if is_our_process_running("mysqld.exe", &mysqld) {
+    if is_our_process_running("mysqld", &mysqld) || is_our_process_running("mariadbd", &mysqld) {
         prepare_mysql_client()?;
         let sql_path = zip_path.with_extension("sql.partial");
         let _sql_guard = PartialFileGuard(sql_path.clone());
@@ -419,12 +414,12 @@ pub async fn delete_full_backup(path: String) -> Result<(), String> {
     Ok(())
 }
 
-/// Open the full backups folder in Windows Explorer.
+/// Open the full backups folder in the system file manager.
 #[tauri::command]
 pub async fn open_backups_folder() -> Result<(), String> {
     let dir = full_backups_dir();
     std::fs::create_dir_all(&dir).ok();
-    std::process::Command::new("explorer")
+    std::process::Command::new("xdg-open")
         .arg(dir)
         .spawn()
         .map_err(|e| format!("Failed to open folder: {}", e))?;
@@ -437,10 +432,6 @@ fn ensure_safe_destination(base: &Path, relative: &Path) -> Result<(), String> {
         if !matches!(component, std::path::Component::Normal(_)) { return Err("Unsafe restore path".into()); }
         current.push(component);
         if let Ok(meta) = std::fs::symlink_metadata(&current) {
-            #[cfg(windows)]
-            { use std::os::windows::fs::MetadataExt;
-              if meta.file_attributes() & 0x400 != 0 { return Err(format!("Cannot restore through a linked path: {}", current.display())); }
-            }
             if meta.file_type().is_symlink() { return Err("Cannot restore through a symbolic link".into()); }
         }
     }
@@ -459,11 +450,6 @@ mod operation_lock_tests {
         let lock_path = root.join("https-operation.lock");
         let mut options = std::fs::OpenOptions::new();
         options.write(true).create_new(true);
-        #[cfg(windows)]
-        {
-            use std::os::windows::fs::OpenOptionsExt;
-            options.share_mode(0);
-        }
         let lock = options.open(&lock_path).unwrap();
         let config = root.join("vhosts.json");
         std::fs::write(&config, b"[]").unwrap();

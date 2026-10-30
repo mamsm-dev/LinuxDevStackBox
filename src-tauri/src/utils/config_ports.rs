@@ -47,7 +47,8 @@ pub fn apache_listen_port() -> u16 {
     std::fs::read_to_string(&path)
         .ok()
         .and_then(|c| parse_listen_port(&c))
-        .unwrap_or(80)
+        // Services run unprivileged on Linux, so the default stays above 1024.
+        .unwrap_or(8080)
 }
 
 pub fn mysql_port() -> u16 {

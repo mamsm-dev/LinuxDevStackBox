@@ -1,4 +1,4 @@
-use crate::utils::paths::{get_installation_path, get_user_data_root, to_apache_path};
+use crate::utils::paths::{ensure_phpmyadmin_copy, get_user_data_root, phpmyadmin_dir, to_apache_path};
 
 const PHPMYADMIN_CONFIG_INC: &str =
     include_str!("../../../config/phpmyadmin.config.inc.php");
@@ -18,9 +18,11 @@ fn user_phpmyadmin_dirs() -> (std::path::PathBuf, std::path::PathBuf, std::path:
     )
 }
 
-/// Writes DevStackBox phpMyAdmin config when missing (e.g. after a bundle refresh without config.inc.php).
+/// Writes the phpMyAdmin config when missing. The served phpMyAdmin copy
+/// lives in the user data dir (see paths::ensure_phpmyadmin_copy) so the
+/// read-only package payload is never modified.
 pub fn ensure_phpmyadmin_config_inc() -> Result<(), String> {
-    let pma_dir = get_installation_path().join("phpmyadmin");
+    let pma_dir = phpmyadmin_dir();
     if !pma_dir.is_dir() {
         return Ok(());
     }
@@ -64,8 +66,14 @@ fn is_bundled_relative_dir(value: &str) -> bool {
 
 /// Migrate UploadDir/SaveDir/TempDir to user-data paths and raise ExecTimeLimit when still at bundled defaults.
 pub fn patch_phpmyadmin_config() -> Result<(), String> {
+    // phpMyAdmin needs a writable config.inc.php; clone the read-only bundled
+    // copy into the user data dir when the install prefix is not writable.
+    if let Err(error) = ensure_phpmyadmin_copy() {
+        println!("phpMyAdmin staging skipped: {error}");
+        return Ok(());
+    }
     ensure_phpmyadmin_config_inc()?;
-    let pma_dir = get_installation_path().join("phpmyadmin");
+    let pma_dir = phpmyadmin_dir();
     let config_path = pma_dir.join("config.inc.php");
     if !config_path.is_file() {
         return Ok(());
@@ -93,8 +101,8 @@ pub fn patch_phpmyadmin_config() -> Result<(), String> {
     }
     // Installed configurations survive upgrades; append the packaged UI policy
     // without replacing connection credentials, ports or user directory settings.
-    if !updated.contains("/devstackbox-theme.inc.php") {
-        updated.push_str("\nif (is_file(__DIR__ . '/devstackbox-theme.inc.php')) {\n    include __DIR__ . '/devstackbox-theme.inc.php';\n}\n");
+    if !updated.contains("/linuxdevstackbox-theme.inc.php") {
+        updated.push_str("\nif (is_file(__DIR__ . '/linuxdevstackbox-theme.inc.php')) {\n    include __DIR__ . '/linuxdevstackbox-theme.inc.php';\n}\n");
     }
     if content.contains("$cfg['UploadDir']") {
         if let Some(line) = content.lines().find(|l| l.contains("$cfg['UploadDir']")) {
