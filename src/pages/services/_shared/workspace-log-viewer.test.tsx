@@ -52,11 +52,11 @@ describe('log workspace actions', () => {
   it('shows a locked-writer refusal without clearing displayed history', async () => {
     mocks.invoke.mockImplementation(async (command) => {
       if (command === 'read_log_chunk') return { ...base, text: 'old\n', reset: true };
-      if (command === 'archive_log') throw new Error('Stop httpd.exe before archiving');
+      if (command === 'archive_log') throw new Error('Stop httpd before archiving');
       throw new Error(`Unexpected ${command}`);
     });
     const ui = await mount();
-    try { await ui.click('Archive current log'); expect(ui.host.textContent).toContain('Stop httpd.exe'); expect(ui.host.querySelector('pre')?.textContent).toContain('old'); }
+    try { await ui.click('Archive current log'); expect(ui.host.textContent).toContain('Stop httpd'); expect(ui.host.querySelector('pre')?.textContent).toContain('old'); }
     finally { await ui.dispose(); }
   });
 });

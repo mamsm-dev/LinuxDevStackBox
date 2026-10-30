@@ -45,7 +45,6 @@
   },
   "terminal": {
     "shell": "Shell",
-    "powershell": "PowerShell",
     "cmd": "CMD",
     "phpCli": "PHP CLI",
     "mysqlCli": "MySQL CLI",

@@ -129,8 +129,6 @@
   "redirects": [
     "/logs",
     "/terminal/shell",
-    "/terminal/powershell",
-    "/terminal/cmd",
     "/terminal/php-cli",
     "/terminal/mysql-cli",
     "/terminal/git",

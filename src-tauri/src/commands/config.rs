@@ -11,7 +11,7 @@ use crate::utils::paths::{user_config_backups_dir, user_config_dir};
 // particular MUST be the user copy, because Apache loads php.ini from there
 // via the PHPRC env var and the installation directory's php.ini is kept
 // pristine. Earlier this pointed at php/current/php.ini in the install dir,
-// which does not exist in the flat NSIS layout and is never the file PHP
+// which is never the file PHP
 // actually reads at runtime.
 fn config_file_for(service: &str) -> Result<PathBuf, String> {
     let config_dir = user_config_dir();

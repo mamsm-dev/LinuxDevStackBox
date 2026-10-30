@@ -7,8 +7,11 @@ import net from 'node:net';
 import assert from 'node:assert/strict';
 
 const root = path.resolve(import.meta.dirname, '..');
-const apache = path.join(root, 'apache/bin/httpd.exe');
-const dir = mkdtempSync(path.join(tmpdir(), 'dsb-overrides-'));
+const apache = ['httpd', 'apache2']
+  .map(name => { try { return execFileSync('which', [name], { encoding: 'utf8' }).trim(); } catch { return null; } })
+  .find(Boolean);
+if (!apache) { console.error('Apache (httpd or apache2) is required for this integration test.'); process.exit(1); }
+const dir = mkdtempSync(path.join(tmpdir(), 'lds-overrides-'));
 const project = path.join(dir, 'Project with spaces');
 mkdirSync(path.join(project, 'public'), { recursive: true });
 writeFileSync(path.join(project, '.htaccess'), '<IfModule mod_rewrite.c>\nRewriteEngine On\nRewriteRule ^ index.php [L]\n</IfModule>\n');

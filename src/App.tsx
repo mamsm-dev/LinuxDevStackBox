@@ -284,14 +284,6 @@ function AppShell() {
               element={<Navigate to="/terminal" replace />}
             />
             <Route
-              path="/terminal/powershell"
-              element={<Navigate to="/terminal" replace />}
-            />
-            <Route
-              path="/terminal/cmd"
-              element={<Navigate to="/terminal" replace />}
-            />
-            <Route
               path="/terminal/php-cli"
               element={<Navigate to="/terminal" replace />}
             />
