@@ -1,0 +1,75 @@
+name: Release
+
+# Publishes a GitHub Release when a version tag (v<major>.<minor>.<patch>)
+# is pushed. The tag version is validated against every project manifest
+# before any build starts; the release only appears if all three packages
+# built successfully and carry the same version.
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: read
+
+jobs:
+  validate-version:
+    name: Validate tag version
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - name: Verify the tag matches every project manifest
+        run: node scripts/verify-packaging-metadata.mjs "${{ github.ref_name }}"
+
+  build:
+    name: Build all packages
+    needs: validate-version
+    uses: ./.github/workflows/build-packages.yml
+    permissions:
+      contents: read
+
+  release:
+    name: Publish GitHub Release
+    needs: [validate-version, build]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Download all built packages
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          path: release
+          merge-multiple: true
+      - name: Verify all package formats and versions
+        run: |
+          version="${{ github.ref_name }}"
+          version="${version#v}"
+          cd release
+          ls -la
+          test "$(ls -1 *.pkg.tar.zst | wc -l)" -eq 1
+          test "$(ls -1 *_amd64.deb | wc -l)" -eq 1
+          test "$(ls -1 *.x86_64.rpm | wc -l)" -eq 1
+          for file in *.pkg.tar.zst *_amd64.deb *.x86_64.rpm; do
+            case "$file" in
+              *"$version"*) ;;
+              *) echo "ERROR: $file does not carry the released version $version"; exit 1 ;;
+            esac
+          done
+          echo "All three package formats present with version $version."
+      - name: Generate SHA256 checksums
+        run: |
+          cd release
+          sha256sum *.pkg.tar.zst *_amd64.deb *.x86_64.rpm > SHA256SUMS
+          cat SHA256SUMS
+      - name: Create the GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          gh release create "$TAG" \
+            --repo "$GITHUB_REPOSITORY" \
+            --verify-tag \
+            --generate-notes \
+            release/SHA256SUMS release/*.pkg.tar.zst release/*_amd64.deb release/*.x86_64.rpm

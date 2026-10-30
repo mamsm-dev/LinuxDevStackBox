@@ -1,0 +1,84 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    name: Frontend, Rust and tests (Ubuntu)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - name: Set up Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 24
+          cache: npm
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+      - name: Install Tauri Linux dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libgtk-3-dev libayatana-appindicator3-dev librsvg2-dev patchelf
+      - name: Verify packaging metadata consistency
+        run: node scripts/verify-packaging-metadata.mjs
+      - name: Install frontend dependencies
+        run: npm ci
+      - name: Frontend checks (tests, typecheck, docs)
+        run: npm run check:ci
+      - name: Frontend production build
+        run: npm run build
+      - name: Rust tests
+        run: cargo test --manifest-path src-tauri/Cargo.toml --lib
+      - name: Rust lints
+        run: cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets -- -D warnings
+
+  packaging-config:
+    name: Packaging configuration lint (Debian, Fedora)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - name: Install Debian and RPM metadata tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y dpkg-dev rpm
+      - name: Verify packaging metadata consistency
+        run: node scripts/verify-packaging-metadata.mjs
+      - name: Parse Debian changelog
+        run: dpkg-parsechangelog -lpackaging/debian/changelog
+      - name: Check Debian control fields
+        run: |
+          grep -q '^Source: linuxdevstackbox$' packaging/debian/control
+          grep -q '^Package: linuxdevstackbox$' packaging/debian/control
+          grep -q '^Architecture: amd64$' packaging/debian/control
+          grep -q '^Depends:.*apache2' packaging/debian/control
+      - name: Parse RPM spec
+        run: rpmspec --parse packaging/fedora/linuxdevstackbox.spec >/dev/null
+
+  arch-config:
+    name: PKGBUILD srcinfo generation (Arch container)
+    runs-on: ubuntu-latest
+    container: archlinux:base-devel
+    steps:
+      - name: Install Node.js for repository tooling
+        run: |
+          pacman -Syu --noconfirm nodejs
+      - name: Check out the repository
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - name: Verify packaging metadata consistency
+        run: node scripts/verify-packaging-metadata.mjs
+      - name: Generate source package info
+        run: |
+          cd packaging/arch
+          makepkg --printsrcinfo > /tmp/srcinfo.txt
+          grep -q "pkgver = " /tmp/srcinfo.txt
+          grep -q "pkgname = linuxdevstackbox" /tmp/srcinfo.txt

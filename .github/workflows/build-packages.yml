@@ -1,0 +1,140 @@
+name: Build Linux packages
+
+# Builds the three Linux packages in distribution-appropriate environments.
+# Invoked by release.yml on version tags; also runnable manually for testing.
+# Each job produces a GitHub Actions artifact; release.yml turns them into a
+# GitHub Release with a SHA256SUMS file.
+
+on:
+  workflow_call:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  PACKAGE_NAME: linuxdevstackbox
+
+jobs:
+  arch:
+    name: Arch Linux package (.pkg.tar.zst)
+    runs-on: ubuntu-latest
+    container: archlinux:base-devel
+    steps:
+      - name: Install build dependencies
+        run: |
+          pacman -Syu --noconfirm git nodejs npm rust webkit2gtk-4.1
+      - name: Check out the repository
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - name: Verify packaging metadata consistency
+        run: node scripts/verify-packaging-metadata.mjs
+      - name: Create the source tarball for makepkg
+        run: |
+          version="$(sed -n 's/^pkgver=\(.*\)$/\1/p' packaging/arch/PKGBUILD)"
+          git archive --prefix="${PACKAGE_NAME}/" \
+            -o "packaging/arch/${PACKAGE_NAME}-${version}.tar.gz" HEAD
+      - name: Build the package as a non-root user
+        run: |
+          useradd -m builder
+          chown -R builder:builder "$GITHUB_WORKSPACE"
+          su builder -c "cd packaging/arch && makepkg -f"
+      - name: Validate the built package
+        run: |
+          pkg="$(ls packaging/arch/*.pkg.tar.zst)"
+          pacman -Qip "$pkg"
+          pacman -Qlp "$pkg" | grep -E 'usr/bin/linuxdevstackbox$'
+          pacman -Qlp "$pkg" | grep -qE 'usr/lib/linuxdevstackbox/phpmyadmin/index\.php$'
+          pacman -Qlp "$pkg" | grep -qE 'usr/share/applications/com\.mam\.linuxdevstackbox\.desktop$'
+      - name: Upload the Arch package
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: arch-package
+          path: packaging/arch/*.pkg.tar.zst
+          if-no-files-found: error
+
+  deb:
+    name: Debian package (.deb)
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - name: Set up Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 24
+          cache: npm
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+      - name: Install Tauri and packaging dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libwebkit2gtk-4.1-dev libgtk-3-dev libayatana-appindicator3-dev \
+            librsvg2-dev patchelf debhelper dpkg-dev lintian
+      - name: Verify packaging metadata consistency
+        run: node scripts/verify-packaging-metadata.mjs
+      - name: Stage the Debian packaging directory
+        run: cp -a packaging/debian ./debian
+      - name: Build the Debian package
+        run: |
+          dpkg-buildpackage -us -uc -b
+          mv "${GITHUB_WORKSPACE}"/../*.deb .
+          mv "${GITHUB_WORKSPACE}"/../*.buildinfo . 2>/dev/null || true
+          mv "${GITHUB_WORKSPACE}"/../*.changes . 2>/dev/null || true
+      - name: Validate the built package
+        run: |
+          pkg="$(ls linuxdevstackbox_*.deb)"
+          dpkg-deb --info "$pkg"
+          dpkg-deb --contents "$pkg" | grep -E 'usr/bin/linuxdevstackbox$'
+          dpkg-deb --contents "$pkg" | grep -qE 'usr/lib/linuxdevstackbox/phpmyadmin/index\.php$'
+          dpkg-deb --contents "$pkg" | grep -qE 'usr/share/applications/com\.mam\.linuxdevstackbox\.desktop$'
+          lintian --fail-on error "$pkg"
+      - name: Upload the Debian package
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: deb-package
+          path: linuxdevstackbox_*.deb
+          if-no-files-found: error
+
+  rpm:
+    name: Fedora package (.rpm)
+    runs-on: ubuntu-latest
+    container: fedora:latest
+    steps:
+      - name: Install build dependencies
+        run: |
+          dnf install -y git nodejs npm rust cargo gcc gcc-c++ make pkgconfig \
+            openssl-devel gtk3-devel webkit2gtk4.1-devel librsvg2-devel \
+            libayatana-appindicator-gtk3-devel rpm-build
+      - name: Check out the repository
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - name: Verify packaging metadata consistency
+        run: node scripts/verify-packaging-metadata.mjs
+      - name: Create the source tarball for rpmbuild
+        run: |
+          version="$(sed -n 's/^Version:[[:space:]]*\([0-9.]*\).*/\1/p' packaging/fedora/linuxdevstackbox.spec | tr -d '[:space:]')"
+          git archive --prefix="${PACKAGE_NAME}-${version}/" \
+            -o "${PACKAGE_NAME}-${version}.tar.gz" HEAD
+      - name: Build the RPM package
+        run: |
+          rpmbuild -bb \
+            --define "_sourcedir $PWD" \
+            --define "_rpmdir $PWD/dist" \
+            --define "_srcrpmdir $PWD/dist" \
+            packaging/fedora/linuxdevstackbox.spec
+      - name: Validate the built package
+        run: |
+          pkg="$(ls dist/RPMS/*/*.rpm)"
+          rpm -qip "$pkg"
+          rpm -qpl "$pkg" | grep -E 'usr/bin/linuxdevstackbox$'
+          rpm -qpl "$pkg" | grep -qE 'usr/lib/linuxdevstackbox/phpmyadmin/index\.php$'
+          rpm -qpl "$pkg" | grep -qE 'usr/share/applications/com\.mam\.linuxdevstackbox\.desktop$'
+          # The binary must be x86_64 and the package must declare its deps.
+          rpm -qp --qf '%{ARCH}\n' "$pkg" | grep -qx x86_64
+          rpm -qp --requires "$pkg" | grep -q httpd
+      - name: Upload the Fedora package
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: rpm-package
+          path: dist/RPMS/*/*.rpm
+          if-no-files-found: error
