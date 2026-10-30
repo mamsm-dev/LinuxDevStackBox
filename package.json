@@ -1,12 +1,12 @@
 {
-  "name": "devstackbox",
+  "name": "linuxdevstackbox",
   "version": "0.1.22",
-  "description": "A lightweight, portable, open-source local development environment for PHP developers",
+  "description": "A lightweight, open-source local development environment for PHP developers on Linux",
   "type": "module",
   "scripts": {
     "predev": "node scripts/sync-logo.mjs && node scripts/stage-phpmyadmin.mjs",
     "dev": "vite",
-    "prebuild": "node scripts/sync-logo.mjs && node scripts/stage-phpmyadmin.mjs && node scripts/build-php-cli.mjs",
+    "prebuild": "node scripts/sync-logo.mjs && node scripts/stage-phpmyadmin.mjs",
     "build": "tsc && vite build",
     "test": "vitest run",
     "test:packaging": "node --test scripts/stage-phpmyadmin.check.mjs",
@@ -14,16 +14,10 @@
     "tauri": "tauri",
     "tauri:dev": "tauri dev",
     "tauri:build": "npm run build:release",
-    "prepare-binaries": "node scripts/verify-release.mjs",
-    "prepare-binaries-optimized": "node scripts/verify-release.mjs",
-    "build:optimized": "npm run build:release",
     "build:release": "node scripts/build-release.mjs",
     "finalize-release": "node scripts/finalize-release.mjs --write-changelog",
-    "release": "node scripts/verify-release.mjs",
-    "check": "npm test && tsc --noEmit && node scripts/validate-docs.mjs && node scripts/verify-release.mjs",
-    "check:ci": "npm test && tsc --noEmit && node scripts/validate-docs.mjs",
-    "build:php-cli": "node scripts/build-php-cli.mjs",
-    "test:php-cli": "node scripts/build-php-cli.mjs && node --test scripts/php-cli.check.mjs"
+    "check": "npm test && tsc --noEmit && node scripts/validate-docs.mjs",
+    "check:ci": "npm test && tsc --noEmit && node scripts/validate-docs.mjs"
   },
   "dependencies": {
     "@monaco-editor/react": "^4.7.0",
@@ -80,7 +74,7 @@
     "vite": "^6.3.5",
     "vitest": "^5.0.0"
   },
-  "author": "Nomad Programmer <hello@devstackbox.com>",
+  "author": "MAM",
   "license": "MIT",
   "repository": {
     "type": "git",
