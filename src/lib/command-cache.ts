@@ -50,7 +50,7 @@ export class CommandCache {
     } finally { entry.pending = undefined; }
   }
   afterMutation(command: string, args?: Record<string, unknown>) {
-    if (/^(switch_php_version|download_php_version|restore_full_backup|import_from_xampp)$/.test(command)) {
+    if (/^(restore_full_backup|import_from_xampp)$/.test(command)) {
       for (const read of ['get_php_versions', 'list_php_extensions', 'read_config', 'list_config_backups']) this.invalidate(read);
     }
     if (/^(update_config|restore_config_backup|backup_config|toggle_php_extension|apply_php_recommended_import_limits)$/.test(command)) {

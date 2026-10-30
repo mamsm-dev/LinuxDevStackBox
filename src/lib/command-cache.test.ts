@@ -34,7 +34,7 @@ describe("stable command reads", () => {
     const read = vi.fn().mockImplementationOnce(() => new Promise<string>(resolve => { finish = resolve; })).mockResolvedValue("new");
     const pending = cache.read("get_php_versions", undefined, read); await Promise.resolve();
     const joined = cache.read("get_php_versions", undefined, read);
-    cache.afterMutation("switch_php_version"); finish("old");
+    cache.afterMutation("restore_full_backup"); finish("old");
     expect(await pending).toBe("new");
     expect(await joined).toBe("new");
     expect(read).toHaveBeenCalledTimes(2);

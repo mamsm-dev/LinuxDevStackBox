@@ -13,7 +13,7 @@ import { Button } from "@/components/ui/button";
 import { isTauri } from "@/lib/tauri";
 import { useServiceStatus } from "@/context/service-status-context";
 
-const STORAGE_KEY = "devstackbox.onboarding.completed";
+const STORAGE_KEY = "linuxdevstackbox.onboarding.completed";
 
 interface OnboardingDialogProps {
   onOpenServices: () => void;
@@ -79,7 +79,7 @@ export function OnboardingDialog({
             <Rocket className="h-6 w-6 text-primary" />
           </div>
           <DialogTitle className="text-center text-2xl">
-            {t("onboarding.title", "Welcome to DevStackBox")}
+            {t("onboarding.title", "Welcome to LinuxDevStackBox")}
           </DialogTitle>
           <DialogDescription className="text-center">
             {t(

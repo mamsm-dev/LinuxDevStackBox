@@ -54,8 +54,8 @@ export function SslPage() {
           </h2>
           <p className="mt-1 text-sm text-muted-foreground">
             {text(
-              "Windows trust, site certificates, and live connections checked together.",
-              "Windows ट्रस्ट, प्रमाणपत्र और लाइव कनेक्शन की एक साथ जाँच।",
+              "System trust, site certificates, and live connections checked together.",
+              "सिस्टम ट्रस्ट, प्रमाणपत्र और लाइव कनेक्शन की एक साथ जाँच।",
             )}
           </p>
         </div>
@@ -90,8 +90,8 @@ export function SslPage() {
             </h3>
             <p className="mt-1 text-sm text-muted-foreground">
               {text(
-                "Certificates are unique to this Windows account and computer. A configured certificate is not marked ready until the live HTTPS check succeeds.",
-                "प्रमाणपत्र इस Windows खाते और कंप्यूटर के लिए हैं। लाइव जाँच सफल होने पर ही तैयार दिखेगा।",
+                "Certificates are unique to this user account and computer. A configured certificate is not marked ready until the live HTTPS check succeeds.",
+                "प्रमाणपत्र इस उपयोगकर्ता खाते और कंप्यूटर के लिए हैं। लाइव जाँच सफल होने पर ही तैयार दिखेगा।",
               )}
             </p>
           </div>
@@ -104,8 +104,8 @@ export function SslPage() {
                 status?.ca_trusted ||
                 window.confirm(
                   text(
-                    "Set up a private local certificate authority and trust it for this Windows account? It can issue certificates trusted by your browsers. Keep its private key on this computer.",
-                    "इस Windows खाते के लिए स्थानीय प्रमाणपत्र प्राधिकरण बनाकर विश्वसनीय करें? उसकी निजी कुंजी इसी कंप्यूटर पर रखें।",
+                    "Set up a private local certificate authority and install it into the system trust store? It can issue certificates trusted by your browsers. Its private key stays on this computer.",
+                    "स्थानीय प्रमाणपत्र प्राधिकरण बनाकर सिस्टम ट्रस्ट स्टोर में जोड़ें? उसकी निजी कुंजी इसी कंप्यूटर पर रहेगी।",
                   ),
                 )
               )
@@ -124,7 +124,7 @@ export function SslPage() {
         </div>
         {status && (
           <p className="text-sm">
-            {text("Windows trust:", "Windows ट्रस्ट:")}{" "}
+            {text("System trust:", "सिस्टम ट्रस्ट:")}{" "}
             {status.ca_trusted
               ? text("Installed for this account", "इस खाते के लिए स्थापित")
               : text("Missing", "अनुपलब्ध")}{" "}
@@ -184,8 +184,8 @@ export function SslPage() {
               </p>
               <p>
                 {text(
-                  "Live verification checks Windows trust, hostname, the served certificate and the correct virtual host.",
-                  "लाइव जाँच Windows ट्रस्ट, नाम, प्रस्तुत प्रमाणपत्र और सही होस्ट जाँचती है।",
+                  "Live verification checks system trust, hostname, the served certificate and the correct virtual host.",
+                  "लाइव जाँच सिस्टम ट्रस्ट, नाम, प्रस्तुत प्रमाणपत्र और सही होस्ट जाँचती है।",
                 )}
               </p>
             </details>

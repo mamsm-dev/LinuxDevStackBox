@@ -172,7 +172,7 @@ export function ServiceStatusProvider({ children }: { children: ReactNode }) {
   // Track previous running state to detect unexpected crashes
   // Only live observations can establish a crash baseline; cache is presentation only.
   const prevRunningRef = useRef<Partial<Record<string, boolean>>>({});
-  // A stop command can return before Windows has fully reaped every child.
+  // A stop command can return before the kernel has fully reaped every child.
   // Remember the expected stop until a live poll observes it so a delayed
   // process exit cannot be misreported as a crash after the loading UI ends.
   const expectedStopsRef = useRef(new Set<string>());
@@ -268,7 +268,7 @@ export function ServiceStatusProvider({ children }: { children: ReactNode }) {
             });
             void notify(
               `${label} stopped unexpectedly`,
-              "Open DevStackBox to view logs and restart the service.",
+              "Open LinuxDevStackBox to view logs and restart the service.",
             );
             void safeInvoke(TAURI_COMMANDS.services.logCrashEvent, {
               service: name,
@@ -518,11 +518,11 @@ export function ServiceStatusProvider({ children }: { children: ReactNode }) {
     let disposed = false;
     (async () => {
       unlisten = await listen("window-hidden-to-tray", () => {
-        const SHOWN_KEY = "devstackbox.tray.hideNoticeShown";
+        const SHOWN_KEY = "linuxdevstackbox.tray.hideNoticeShown";
         if (!localStorage.getItem(SHOWN_KEY)) {
           localStorage.setItem(SHOWN_KEY, "1");
           void notify(
-            "DevStackBox is still running",
+            "LinuxDevStackBox is still running",
             "The app is minimized to the system tray. Click the tray icon to restore it.",
           );
         }

@@ -6,10 +6,10 @@
 import { safeInvoke, isTauri } from "@/lib/tauri";
 import { TAURI_COMMANDS } from "@/lib/commands";
 
-export const AUTOSTART_APACHE_KEY = "devstackbox.settings.autoStartApache";
-export const AUTOSTART_MYSQL_KEY = "devstackbox.settings.autoStartMysql";
-export const MINIMIZE_TO_TRAY_KEY = "devstackbox.settings.minimizeToTray";
-export const UPDATE_CHANNEL_KEY = "devstackbox.settings.updateChannel";
+export const AUTOSTART_APACHE_KEY = "linuxdevstackbox.settings.autoStartApache";
+export const AUTOSTART_MYSQL_KEY = "linuxdevstackbox.settings.autoStartMysql";
+export const MINIMIZE_TO_TRAY_KEY = "linuxdevstackbox.settings.minimizeToTray";
+export const UPDATE_CHANNEL_KEY = "linuxdevstackbox.settings.updateChannel";
 
 export interface AppSettingsPayload {
   minimizeToTray: boolean;

@@ -15,7 +15,7 @@ import { safeInvoke, isTauri } from "@/lib/tauri";
 import { TAURI_COMMANDS } from "@/lib/commands";
 import { ROUTES } from "@/lib/routes";
 
-const DISMISS_KEY = "devstackbox.security.rootPasswordPromptDismissed";
+const DISMISS_KEY = "linuxdevstackbox.security.rootPasswordPromptDismissed";
 
 interface SecurityFinding {
   service: string;

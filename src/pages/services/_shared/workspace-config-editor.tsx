@@ -44,7 +44,7 @@ export function WorkspaceConfigEditor({
   const [loading, setLoading] = useState(true);
   const [loaded, setLoaded] = useState(false);
   const [loadError, setLoadError] = useState(false);
-  const draftKey = `devstackbox-config-draft-${service}`;
+  const draftKey = `linuxdevstackbox-config-draft-${service}`;
 
   const monacoTheme = resolvedTheme === "dark" ? "vs-dark" : "vs";
 

@@ -225,7 +225,7 @@ export function RestoreSqlDialog({
                 {t(
                   key,
                   value === "follow_dump"
-                    ? "Restore using database names in the file (recommended for DevStackBox backups and mysqldump --databases)"
+                    ? "Restore using database names in the file (recommended for LinuxDevStackBox backups and mysqldump --databases)"
                     : "Use a selected database when the file does not specify one (does not override USE or CREATE DATABASE inside the file)",
                 )}
               </button>

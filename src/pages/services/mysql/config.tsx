@@ -7,7 +7,7 @@ export function MySqlConfigPage() {
     <WorkspaceConfigEditor
       service="mysql"
       title={t("mysql.config.title", "MySQL Configuration")}
-      filename="%LOCALAPPDATA%\devstackbox\config\my.cnf"
+      filename="%LOCALAPPDATA%\linuxdevstackbox\config\my.cnf"
       language="ini"
     />
   );

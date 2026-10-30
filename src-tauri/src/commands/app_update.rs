@@ -8,9 +8,9 @@ use url::Url;
 use crate::utils::app_settings::read_app_settings;
 
 const STABLE_ENDPOINT: &str =
-    "https://github.com/DevStackBox/DevStackBox/releases/latest/download/latest.json";
+    "https://github.com/mamsm-dev/LinuxDevStackBox/releases/latest/download/latest.json";
 const BETA_ENDPOINT: &str =
-    "https://github.com/DevStackBox/DevStackBox/releases/download/v0.1.9-beta/latest.json";
+    "https://github.com/mamsm-dev/LinuxDevStackBox/releases/download/latest/latest.json";
 
 pub fn updater_endpoint_string() -> String {
     if read_app_settings().update_channel == "beta" {

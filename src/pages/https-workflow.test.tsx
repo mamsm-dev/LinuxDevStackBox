@@ -59,7 +59,7 @@ describe("local site health", () => {
           enabled: true,
           https: true,
           verified: false,
-          message: "Windows trust missing",
+          message: "System trust missing",
           expiry: null,
           url: "https://localhost/",
         },
@@ -78,7 +78,7 @@ describe("local site health", () => {
       command === "list_vhosts"
         ? []
         : command === "list_www_projects"
-          ? [{ name: "shop", path: "C:/devstackbox/www/shop" }]
+          ? [{ name: "shop", path: "C:/linuxdevstackbox/www/shop" }]
           : command === "get_site_configuration_warnings"
             ? []
             : command === "get_hosts_entries"

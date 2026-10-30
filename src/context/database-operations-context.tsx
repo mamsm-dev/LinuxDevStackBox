@@ -45,7 +45,7 @@ export async function databaseInvoke<T>(
 ): Promise<T> {
   if (!isTauri())
     throw new Error(
-      "This operation requires the native DevStackBox application.",
+      "This operation requires the native LinuxDevStackBox application.",
     );
   return (await safeInvoke<T>(command, args)) as T;
 }

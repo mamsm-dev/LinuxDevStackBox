@@ -1,9 +1,9 @@
 export const URLS = {
-  website: "https://www.devstackbox.com",
-  docs: "https://www.devstackbox.com/docs",
-  download: "https://www.devstackbox.com/download",
-  roadmap: "https://www.devstackbox.com/roadmap",
-  githubRepo: "https://github.com/DevStackBox/DevStackBox",
-  githubIssues: "https://github.com/DevStackBox/DevStackBox/issues",
-  githubNewIssue: "https://github.com/DevStackBox/DevStackBox/issues/new",
+  website: "https://github.com/mamsm-dev/LinuxDevStackBox",
+  docs: "https://github.com/mamsm-dev/LinuxDevStackBox#readme",
+  download: "https://github.com/mamsm-dev/LinuxDevStackBox/releases",
+  roadmap: "https://github.com/mamsm-dev/LinuxDevStackBox/blob/main/PROJECT-ROADMAP.md",
+  githubRepo: "https://github.com/mamsm-dev/LinuxDevStackBox",
+  githubIssues: "https://github.com/mamsm-dev/LinuxDevStackBox/issues",
+  githubNewIssue: "https://github.com/mamsm-dev/LinuxDevStackBox/issues/new",
 } as const;

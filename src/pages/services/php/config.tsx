@@ -7,7 +7,7 @@ export function PhpConfigPage() {
     <WorkspaceConfigEditor
       service="php"
       title={t("php.config.title", "PHP Configuration")}
-      filename="%LOCALAPPDATA%\devstackbox\config\php.ini"
+      filename="%LOCALAPPDATA%\linuxdevstackbox\config\php.ini"
       language="ini"
     />
   );

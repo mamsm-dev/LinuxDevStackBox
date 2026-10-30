@@ -30,7 +30,7 @@ export function BugReportDialog({ trigger }: BugReportDialogProps) {
   const buildBody = () => {
     const env = [
       `**App version:** v${APP_VERSION}`,
-      `**OS:** ${navigator.platform || "Windows"}`,
+      `**OS:** ${navigator.platform || "Linux"}`,
       `**User agent:** ${navigator.userAgent}`,
     ].join("\n");
 

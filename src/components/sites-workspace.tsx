@@ -354,7 +354,7 @@ export function SitesWorkspace({ advanced = false }: { advanced?: boolean }) {
                     if (
                       window.confirm(
                         text(
-                          `Disconnect ${site.domain}? Project files are kept. Windows may request permission to remove its hostname.`,
+                          `Disconnect ${site.domain}? Project files are kept. Your desktop may request permission to remove its hostname.`,
                           `${site.domain} डिस्कनेक्ट करें? प्रोजेक्ट फ़ाइलें सुरक्षित रहेंगी।`,
                         ),
                       )
@@ -420,8 +420,8 @@ export function SitesWorkspace({ advanced = false }: { advanced?: boolean }) {
           </h3>
           <p className="text-sm text-muted-foreground">
             {text(
-              "These entries remain in the managed Windows hosts block. Connect a site with that name, or remove only the mapping.",
-              "ये प्रविष्टियाँ Windows hosts में हैं। इसी नाम से साइट जोड़ें या मैपिंग हटाएँ।",
+              "These entries remain in the managed /etc/hosts block. Connect a site with that name, or remove only the mapping.",
+              "ये प्रविष्टियाँ /etc/hosts में हैं। इसी नाम से साइट जोड़ें या मैपिंग हटाएँ।",
             )}
           </p>
           {orphaned.map((n) => (
@@ -597,8 +597,8 @@ export function SitesWorkspace({ advanced = false }: { advanced?: boolean }) {
                 />
                 <p className="mt-1 text-xs text-muted-foreground">
                   {text(
-                    "Comma-separated .test names. Each mapping may request Windows permission.",
-                    "अल्पविराम से अलग .test नाम। Windows अनुमति माँग सकता है।",
+                    "Comma-separated .test names. Each mapping may request administrator permission.",
+                    "अल्पविराम से अलग .test नाम। व्यवस्थापक अनुमति माँगी जा सकती है।",
                   )}
                 </p>
               </details>
@@ -625,8 +625,8 @@ export function SitesWorkspace({ advanced = false }: { advanced?: boolean }) {
                   : ""}
                 /<br />
                 {text(
-                  "Windows may request administrator permission to map the hostname. Apache restarts if running.",
-                  "होस्टनाम के लिए Windows अनुमति माँग सकता है। चल रहा Apache पुनः शुरू होगा।",
+                  "Your desktop may request administrator permission (polkit) to map the hostname. Apache restarts if running.",
+                  "होस्टनाम के लिए व्यवस्थापक अनुमति (polkit) माँगी जा सकती है। चल रहा Apache पुनः शुरू होगा।",
                 )}
               </p>
             </fieldset>

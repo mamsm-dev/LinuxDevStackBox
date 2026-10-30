@@ -5,7 +5,7 @@
  *
  * Cache invalidation rules (exactly three, no TTL):
  *  1. cacheVersion !== APP_VERSION  → full rebuild (app was updated)
- *  2. devstackbox:php-version-changed event  → patch php_versions field only
+ *  2. linuxdevstackbox:php-version-changed event  → patch php_versions field only
  *  3. No existing cache  → fetch once and cache it
  *
  * initializeSystemInfoCache() MUST be called once at App startup.
@@ -153,7 +153,7 @@ export async function getSystemInfoCached(): Promise<SystemInfo | null> {
  */
 export function initializeSystemInfoCache(): void {
   window.addEventListener(
-    "devstackbox:php-version-changed",
+    "linuxdevstackbox:php-version-changed",
     () => void refreshPhpVersions(),
   );
 }

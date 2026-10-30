@@ -52,7 +52,7 @@ export function Sidebar({
             >
               <AppLogo />
               <div className="min-w-0">
-                <h2 className="font-semibold text-sm truncate">DevStackBox</h2>
+                <h2 className="font-semibold text-sm truncate">LinuxDevStackBox</h2>
                 <p className="text-xs text-muted-foreground">v{APP_VERSION}</p>
               </div>
             </motion.div>

@@ -270,7 +270,7 @@ export function DatabaseTransferPage() {
                 >
                   <option value="sql">SQL</option>
                   <option value="gzip">SQL.GZ</option>
-                  <option value="zip">DevStackBox ZIP</option>
+                  <option value="zip">LinuxDevStackBox ZIP</option>
                 </select>
               </label>
             </div>

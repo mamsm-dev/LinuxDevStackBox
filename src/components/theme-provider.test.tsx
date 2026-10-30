@@ -3,7 +3,7 @@ import { createRoot } from "react-dom/client";
 import { describe, it, expect, vi } from "vitest";
 import { ThemeProvider, useTheme } from "./theme-provider";
 
-describe("Windows appearance", () => {
+describe("System appearance", () => {
   it("follows system changes and preserves an explicit user preference", async () => {
     localStorage.clear();
     let change: (() => void) | undefined;
@@ -17,7 +17,7 @@ describe("Windows appearance", () => {
     await act(async () => { query.matches = true; change?.(); });
     expect(document.documentElement.classList.contains("dark")).toBe(true);
     await act(async () => host.querySelector("button")!.click());
-    expect(localStorage.getItem("devstackbox-ui-theme")).toBe("light");
+    expect(localStorage.getItem("linuxdevstackbox-ui-theme")).toBe("light");
     await act(async () => { query.matches = false; change?.(); query.matches = true; change?.(); });
     expect(document.documentElement.classList.contains("light")).toBe(true);
     await act(async () => root.unmount());

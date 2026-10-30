@@ -52,7 +52,7 @@
     "gitBash": "Git Bash"
   },
   "app": {
-    "title": "DevStackBox",
+    "title": "LinuxDevStackBox",
     "subtitle": "PHP Development Environment",
     "description": "A lightweight, portable, open-source local development environment for PHP developers"
   },
@@ -153,7 +153,7 @@
     "enabled": "Enabled",
     "disabled": "Disabled",
     "hostsFileSection": "Windows Hosts File",
-    "hostsFileDesc": "For \"myapp.test\" to resolve in a browser, add it to the Windows hosts file. This requires administrator (UAC) permission.",
+    "hostsFileDesc": "For \"myapp.test\" to resolve in a browser, add it to the /etc/hosts file. This requires administrator (UAC) permission.",
     "addToHosts": "Add to hosts",
     "removeFromHosts": "Remove from hosts",
     "inHosts": "In hosts file",
@@ -237,16 +237,16 @@
     "language": "Language",
     "languageDesc": "User interface language.",
     "startup": "Startup",
-    "startupDesc": "Control whether DevStackBox launches when you sign in.",
+    "startupDesc": "Control whether LinuxDevStackBox launches when you sign in.",
     "autostart": "Launch at login",
-    "autostartDesc": "Adds a Windows registry entry under HKCU Run. No admin needed.",
+    "autostartDesc": "Adds a an XDG autostart entry. No admin needed.",
     "autostartEnabled": "Autostart enabled",
     "autostartDisabled": "Autostart disabled",
     "autostartFailed": "Failed to update autostart",
     "previewOnly": "Preview only",
     "previewOnlyDesc": "Autostart is configured by the desktop app at runtime.",
     "updates": "Updates",
-    "updatesDesc": "DevStackBox can quietly check GitHub Releases for new versions.",
+    "updatesDesc": "LinuxDevStackBox can quietly check GitHub Releases for new versions.",
     "autoCheck": "Check for updates automatically",
     "autoCheckDesc": "On launch and once every 6 hours.",
     "autoCheckOn": "Automatic update checks enabled",
@@ -259,11 +259,11 @@
     "channelStable": "Stable",
     "channelBeta": "Beta",
     "services": "Services on app launch",
-    "servicesDesc": "Automatically start selected services when DevStackBox opens. Applies on next launch.",
+    "servicesDesc": "Automatically start selected services when LinuxDevStackBox opens. Applies on next launch.",
     "autoStartApache": "Auto-start Apache",
-    "autoStartApacheDesc": "Start the HTTP server when DevStackBox launches.",
+    "autoStartApacheDesc": "Start the HTTP server when LinuxDevStackBox launches.",
     "autoStartMysql": "Auto-start MySQL",
-    "autoStartMysqlDesc": "Start the database server when DevStackBox launches.",
+    "autoStartMysqlDesc": "Start the database server when LinuxDevStackBox launches.",
     "minimizeToTray": "Minimize to tray on close",
     "minimizeToTrayDesc": "Keep services running in the background when the window closes."
   },
@@ -358,7 +358,7 @@
     "restoreSqlTitle": "Restore from .sql file",
     "restorePartialWarning": "Import may partially apply before failing; there is no automatic rollback. For very large dumps, use this dialog instead of phpMyAdmin.",
     "chooseSqlFile": "Choose .sql file…",
-    "restoreModeFollow": "Restore using database names in the file (recommended for DevStackBox backups and mysqldump --databases)",
+    "restoreModeFollow": "Restore using database names in the file (recommended for LinuxDevStackBox backups and mysqldump --databases)",
     "restoreModeInitial": "Use a selected database when the file does not specify one (does not override USE or CREATE DATABASE inside the file)",
     "restoreCreateNew": "Create / use a new database name",
     "newDbPlaceholder": "my_database",
@@ -400,13 +400,13 @@
   "ssl": {
     "refresh": "Refresh",
     "currentStatus": "Current Status",
-    "caGenerated": "Local Root CA generated (DevStackBox Local CA)",
+    "caGenerated": "Local Root CA generated (LinuxDevStackBox Local CA)",
     "certSigned": "localhost certificate signed by CA",
     "sslEnabled": "SSL enabled in Apache config",
     "expires": "Expires",
     "loadingStatus": "Loading status...",
     "generateTitle": "Generate CA + Certificate",
-    "generateDesc": "Creates a Local Root CA (DevStackBox Local CA) then signs a 10-year localhost certificate with it. Re-run to regenerate the localhost cert without touching the CA.",
+    "generateDesc": "Creates a Local Root CA (LinuxDevStackBox Local CA) then signs a 10-year localhost certificate with it. Re-run to regenerate the localhost cert without touching the CA.",
     "generate": "Generate",
     "enableTitle": "Enable SSL",
     "enableDesc": "Adds mod_ssl and an HTTPS VirtualHost (port 443) to Apache config. Generates a certificate if one does not exist yet.",
@@ -416,12 +416,12 @@
     "disableDesc": "Removes the SSL Include from httpd.conf. Certificate files are kept so SSL can be re-enabled without regenerating.",
     "disable": "Disable",
     "trustTitle": "Trust the Root CA in Windows (one-time)",
-    "trustDesc": "Import the CA certificate once. Every certificate DevStackBox generates - for localhost and future virtual hosts - is then trusted automatically. No more browser warnings.",
+    "trustDesc": "Import the CA certificate once. Every certificate LinuxDevStackBox generates - for localhost and future virtual hosts - is then trusted automatically. No more browser warnings.",
     "trustStep1": "Open certmgr.msc (Windows Certificate Manager).",
     "trustStep2": "Navigate to Trusted Root Certification Authorities > Certificates.",
     "trustStep3": "Right-click and choose All Tasks > Import...",
     "trustStep4": "Browse to ca.crt (path shown below) and complete the import wizard.",
-    "trustStep5": "Restart your browser. All DevStackBox HTTPS sites will be trusted without any further action.",
+    "trustStep5": "Restart your browser. All LinuxDevStackBox HTTPS sites will be trusted without any further action.",
     "generateFirst": "Generate the CA first to see its path."
   },
   "backup": {
@@ -462,7 +462,7 @@
     "notRunning": "Not running"
   },
   "onboarding": {
-    "title": "Welcome to DevStackBox",
+    "title": "Welcome to LinuxDevStackBox",
     "description": "A portable local PHP development environment with Apache, MySQL, and PHP 8.3 ready to go.",
     "bundled": "Bundled",
     "callToAction": "Start all services now, or explore the dashboard first.",
@@ -497,7 +497,7 @@
     "serviceNowStopped": "{{service}} service has been stopped",
     "serviceError": "Service Error",
     "serviceErrorDesc": "Failed to start/stop {{service}}.",
-    "trayNotice": "DevStackBox is still running",
+    "trayNotice": "LinuxDevStackBox is still running",
     "trayNoticeDesc": "The app is minimized to the system tray. Click the tray icon to restore it."
   },
   "sidebar": {
@@ -529,7 +529,7 @@
     "exportSelected": "Export selected",
     "backupSelected": "Back up selected to managed folder",
     "offlineTransfers": "MySQL is not running. Start it from Services to perform database operations. Saved backups and activity remain available.",
-    "importDescription": "Choose SQL, SQL.GZ, a ZIP containing one SQL file at its root, or a DevStackBox ZIP package. Jobs run sequentially and stop after the first failure. Review existing targets and take a backup before importing.",
+    "importDescription": "Choose SQL, SQL.GZ, a ZIP containing one SQL file at its root, or a LinuxDevStackBox ZIP package. Jobs run sequentially and stop after the first failure. Review existing targets and take a backup before importing.",
     "chooseFiles": "Choose files",
     "initialDatabase": "Initial database (blank: names in SQL)",
     "existingTarget": "Existing target: a full dump may fail if tables already exist. Use a new, empty database for a separate restore. SQL may also modify or delete existing objects and data.",
@@ -623,12 +623,13 @@
     "workspaceDescription": "Local databases, accounts, imports, exports and backups."
   },
   "php": {
-    "active": "Default",
-    "activeVersion": "Default",
+    "active": "System default",
+    "activeVersion": "System default",
     "activate": "Set as default",
     "activated": "PHP {{version}} is now the default",
     "activateFailed": "Failed to set PHP {{version}} as default",
-    "defaultScope": "The default version is used by the PHP command and projects set to inherit it. Projects pinned to another installed version keep their selection."
+    "defaultScope": "The system PHP is used by the php command and by projects set to inherit it. Apache must be restarted after a PHP package upgrade so the CGI handler reloads.",
+    "versionDescription": "PHP comes from your distribution's packages. Upgrade it with your package manager (pacman, apt or dnf); LinuxDevStackBox picks up the new runtime automatically."
   },
   "audit": {
     "logsCopied": "Logs copied to clipboard",

@@ -53,7 +53,7 @@
     "gitBash": "Git Bash"
   },
   "app": {
-    "title": "DevStackBox",
+    "title": "LinuxDevStackBox",
     "subtitle": "PHP डेवलपमेंट एनवायरनमेंट",
     "description": "PHP डेवलपर्स के लिए एक लाइटवेट, पोर्टेबल, ओपन-सोर्स लोकल डेवलपमेंट एनवायरनमेंट"
   },
@@ -154,7 +154,7 @@
     "enabled": "इनेबल्ड",
     "disabled": "डिसेबल्ड",
     "hostsFileSection": "Windows Hosts फ़ाइल",
-    "hostsFileDesc": "\"myapp.test\" को ब्राउज़र में resolve करने के लिए, इसे Windows hosts फ़ाइल में जोड़ें। इसके लिए एडमिनिस्ट्रेटर (UAC) परमिशन आवश्यक है।",
+    "hostsFileDesc": "\"myapp.test\" को ब्राउज़र में resolve करने के लिए, इसे /etc/hosts फ़ाइल में जोड़ें। इसके लिए एडमिनिस्ट्रेटर (UAC) परमिशन आवश्यक है।",
     "addToHosts": "Hosts में जोड़ें",
     "removeFromHosts": "Hosts से हटाएं",
     "inHosts": "Hosts फ़ाइल में मौजूद है",
@@ -238,7 +238,7 @@
     "language": "भाषा",
     "languageDesc": "यूजर इंटरफेस भाषा।",
     "startup": "स्टार्टअप",
-    "startupDesc": "तय करें कि साइन इन करने पर DevStackBox ऑटोमैटिक लॉन्च हो या नहीं।",
+    "startupDesc": "तय करें कि साइन इन करने पर LinuxDevStackBox ऑटोमैटिक लॉन्च हो या नहीं।",
     "autostart": "लॉगिन पर शुरू करें",
     "autostartDesc": "HKCU Run के तहत एक Windows रजिस्ट्री एंट्री जोड़ता है। किसी एडमिन परमिशन की जरूरत नहीं।",
     "autostartEnabled": "ऑटो-स्टार्ट सक्षम",
@@ -247,7 +247,7 @@
     "previewOnly": "केवल प्रीव्यू",
     "previewOnlyDesc": "ऑटो-स्टार्ट रनटाइम पर डेस्कटॉप ऐप द्वारा कॉन्फ़िगर किया जाता है।",
     "updates": "अपडेट्स",
-    "updatesDesc": "DevStackBox नए वर्जन्स के लिए GitHub Releases चेक कर सकता है।",
+    "updatesDesc": "LinuxDevStackBox नए वर्जन्स के लिए GitHub Releases चेक कर सकता है।",
     "autoCheck": "ऑटोमैटिक अपडेट्स चेक करें",
     "autoCheckDesc": "ऐप लॉन्च होने पर और हर 6 घंटे में एक बार।",
     "autoCheckOn": "ऑटोमैटिक अपडेट चेक सक्षम",
@@ -260,11 +260,11 @@
     "channelStable": "Stable",
     "channelBeta": "Beta",
     "services": "ऐप लॉन्च पर सर्विसेज",
-    "servicesDesc": "DevStackBox खुलने पर चुनी गई सर्विसेज अपने आप शुरू करें। अगले लॉन्च पर लागू होगा।",
+    "servicesDesc": "LinuxDevStackBox खुलने पर चुनी गई सर्विसेज अपने आप शुरू करें। अगले लॉन्च पर लागू होगा।",
     "autoStartApache": "Apache स्वतः शुरू करें",
-    "autoStartApacheDesc": "DevStackBox लॉन्च होने पर HTTP सर्वर शुरू करें।",
+    "autoStartApacheDesc": "LinuxDevStackBox लॉन्च होने पर HTTP सर्वर शुरू करें।",
     "autoStartMysql": "MySQL स्वतः शुरू करें",
-    "autoStartMysqlDesc": "DevStackBox लॉन्च होने पर डेटाबेस सर्वर शुरू करें।",
+    "autoStartMysqlDesc": "LinuxDevStackBox लॉन्च होने पर डेटाबेस सर्वर शुरू करें।",
     "minimizeToTray": "क्लोज करने पर सिस्टम ट्रे में मिनिमाइज करें",
     "minimizeToTrayDesc": "विंडो क्लोज होने पर भी सर्विसेज बैकग्राउंड में चलती रहें।"
   },
@@ -359,7 +359,7 @@
     "restoreSqlTitle": ".sql फ़ाइल से रीस्टोर करें",
     "restorePartialWarning": "विफल होने से पहले इम्पोर्ट आंशिक रूप से लागू हो सकता है; कोई ऑटोमैटिक रोलबैक नहीं होता। बहुत बड़े डंप्स के लिए phpMyAdmin के बजाय इस डायलॉग का उपयोग करें।",
     "chooseSqlFile": ".sql फ़ाइल चुनें…",
-    "restoreModeFollow": "फ़ाइल में दिए गए डेटाबेस नामों का उपयोग करके रीस्टोर करें (DevStackBox बैकअप और mysqldump --databases के लिए अनुशंसित)",
+    "restoreModeFollow": "फ़ाइल में दिए गए डेटाबेस नामों का उपयोग करके रीस्टोर करें (LinuxDevStackBox बैकअप और mysqldump --databases के लिए अनुशंसित)",
     "restoreModeInitial": "जब फ़ाइल में निर्दिष्ट न हो तो चुने गए डेटाबेस का उपयोग करें (फ़ाइल में USE या CREATE DATABASE को ओवरराइड नहीं करता)",
     "restoreCreateNew": "नया डेटाबेस नाम बनाएं / उपयोग करें",
     "newDbPlaceholder": "my_database",
@@ -401,13 +401,13 @@
   "ssl": {
     "refresh": "रिफ्रेश करें",
     "currentStatus": "वर्तमान स्टेटस",
-    "caGenerated": "लोकल Root CA जनरेट हो गया (DevStackBox Local CA)",
+    "caGenerated": "लोकल Root CA जनरेट हो गया (LinuxDevStackBox Local CA)",
     "certSigned": "CA द्वारा हस्ताक्षरित localhost सर्टिफिकेट",
     "sslEnabled": "Apache config में SSL सक्षम",
     "expires": "समाप्ति तिथि",
     "loadingStatus": "स्टेटस लोड हो रहा है...",
     "generateTitle": "CA + सर्टिफिकेट जनरेट करें",
-    "generateDesc": "एक लोकल Root CA (DevStackBox Local CA) बनाता है और फिर इसके साथ 10 साल का localhost सर्टिफिकेट साइन करता है। CA को छुए बिना localhost सर्टिफिकेट दोबारा जनरेट करने के लिए इसे फिर से रन करें।",
+    "generateDesc": "एक लोकल Root CA (LinuxDevStackBox Local CA) बनाता है और फिर इसके साथ 10 साल का localhost सर्टिफिकेट साइन करता है। CA को छुए बिना localhost सर्टिफिकेट दोबारा जनरेट करने के लिए इसे फिर से रन करें।",
     "generate": "जनरेट करें",
     "enableTitle": "SSL इनेबल करें",
     "enableDesc": "Apache config में mod_ssl और एक HTTPS VirtualHost (पोर्ट 443) जोड़ता है। यदि सर्टिफिकेट मौजूद नहीं है, तो उसे जनरेट करता है।",
@@ -417,12 +417,12 @@
     "disableDesc": "httpd.conf से SSL Include हटाता है। सर्टिफिकेट फ़ाइलें सुरक्षित रखी जाती हैं ताकि दोबारा जनरेट किए बिना SSL फिर से इनेबल किया जा सके।",
     "disable": "डिसेबल करें",
     "trustTitle": "Windows में Root CA पर ट्रस्ट करें (वन-टाइम)",
-    "trustDesc": "CA सर्टिफिकेट एक बार इम्पोर्ट करें। DevStackBox द्वारा localhost और आने वाले वर्चुअल होस्ट्स के लिए बनाए गए सभी सर्टिफिकेट्स अपने आप ट्रस्टेड हो जाएंगे। ब्राउज़र में कोई वॉर्निंग नहीं आएगी।",
+    "trustDesc": "CA सर्टिफिकेट एक बार इम्पोर्ट करें। LinuxDevStackBox द्वारा localhost और आने वाले वर्चुअल होस्ट्स के लिए बनाए गए सभी सर्टिफिकेट्स अपने आप ट्रस्टेड हो जाएंगे। ब्राउज़र में कोई वॉर्निंग नहीं आएगी।",
     "trustStep1": "certmgr.msc (Windows Certificate Manager) खोलें।",
     "trustStep2": "Trusted Root Certification Authorities > Certificates पर जाएं।",
     "trustStep3": "राइट-क्लिक करें और All Tasks > Import... चुनें।",
     "trustStep4": "ca.crt (नीचे दिए गए पाथ) पर जाएं और इम्पोर्ट विज़ार्ड पूरा करें।",
-    "trustStep5": "अपना ब्राउज़र रीस्टार्ट करें। DevStackBox की सभी HTTPS साइट्स अपने आप ट्रस्टेड हो जाएंगी।",
+    "trustStep5": "अपना ब्राउज़र रीस्टार्ट करें। LinuxDevStackBox की सभी HTTPS साइट्स अपने आप ट्रस्टेड हो जाएंगी।",
     "generateFirst": "पाथ देखने के लिए पहले CA जनरेट करें।"
   },
   "backup": {
@@ -463,7 +463,7 @@
     "notRunning": "बंद है"
   },
   "onboarding": {
-    "title": "DevStackBox में आपका स्वागत है",
+    "title": "LinuxDevStackBox में आपका स्वागत है",
     "description": "Apache, MySQL, और PHP 8.3 के साथ एक पोर्टेबल लोकल PHP डेवलपमेंट एनवायरनमेंट।",
     "bundled": "बंडल किया गया",
     "callToAction": "अभी सभी सर्विसेज शुरू करें, या पहले डैशबोर्ड एक्सप्लोर करें।",
@@ -498,7 +498,7 @@
     "serviceNowStopped": "{{service}} सर्विस बंद कर दी गई है",
     "serviceError": "सर्विस एरर",
     "serviceErrorDesc": "{{service}} शुरू/बंद करने में विफल।",
-    "trayNotice": "DevStackBox अभी भी चल रहा है",
+    "trayNotice": "LinuxDevStackBox अभी भी चल रहा है",
     "trayNoticeDesc": "ऐप सिस्टम ट्रे में मिनिमाइज है। इसे वापस खोलने के लिए ट्रे आइकन पर क्लिक करें।"
   },
   "sidebar": {
@@ -530,7 +530,7 @@
     "exportSelected": "चयनित निर्यात करें",
     "backupSelected": "चयनित का प्रबंधित फ़ोल्डर में बैकअप लें",
     "offlineTransfers": "MySQL चालू नहीं है। डेटाबेस कार्यों के लिए सेवाओं से इसे शुरू करें। सहेजे बैकअप और गतिविधि उपलब्ध हैं।",
-    "importDescription": "SQL, SQL.GZ, मूल फ़ोल्डर में एक SQL फ़ाइल वाला ZIP या DevStackBox ZIP चुनें। कार्य क्रम में चलेंगे और पहली विफलता पर रुकेंगे। आयात से पहले लक्ष्य जाँचें और बैकअप लें।",
+    "importDescription": "SQL, SQL.GZ, मूल फ़ोल्डर में एक SQL फ़ाइल वाला ZIP या LinuxDevStackBox ZIP चुनें। कार्य क्रम में चलेंगे और पहली विफलता पर रुकेंगे। आयात से पहले लक्ष्य जाँचें और बैकअप लें।",
     "chooseFiles": "फ़ाइलें चुनें",
     "initialDatabase": "प्रारंभिक डेटाबेस (खाली: SQL के नाम)",
     "existingTarget": "मौजूदा लक्ष्य: टेबल पहले से मौजूद होने पर पूरा डंप आयात विफल हो सकता है। अलग पुनर्स्थापना के लिए नया, खाली डेटाबेस चुनें। SQL मौजूदा ऑब्जेक्ट और डेटा बदल या मिटा भी सकता है।",
@@ -624,7 +624,7 @@
     "workspaceDescription": "स्थानीय डेटाबेस, खाते, आयात, निर्यात और बैकअप।"
   },
   "php": {
-    "active": "डिफ़ॉल्ट",
+    "active": "सिस्टम डिफ़ॉल्ट",
     "activeVersion": "डिफ़ॉल्ट",
     "activate": "डिफ़ॉल्ट बनाएं",
     "activated": "PHP {{version}} अब डिफ़ॉल्ट है",

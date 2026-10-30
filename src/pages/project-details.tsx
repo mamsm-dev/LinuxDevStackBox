@@ -326,7 +326,7 @@ export function ProjectDetailsPage() {
                   Enable trusted HTTPS
                 </label>
                 <p className="text-sm text-muted-foreground">
-                  Use .test hostnames. Windows may ask for permission to update
+                  Use .test hostnames. Your desktop may ask for permission (polkit) to update
                   hostname mappings. Saving restarts Apache if it is running.
                 </p>
                 <div className="flex flex-wrap gap-2">

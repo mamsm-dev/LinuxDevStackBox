@@ -53,8 +53,8 @@ export function SettingsXamppImportPage() {
       <CardHeader>
         <CardTitle>Import from XAMPP</CardTitle>
         <CardDescription>
-          Copy projects from XAMPP htdocs into DevStackBox www. Existing files with the same name are
-          skipped. Export MySQL from XAMPP phpMyAdmin and import in DevStackBox for databases.
+          Copy projects from XAMPP htdocs into LinuxDevStackBox www. Existing files with the same name are
+          skipped. Export MySQL from XAMPP phpMyAdmin and import in LinuxDevStackBox for databases.
           {" "}{t("xamppImport.connectAlternative", "To keep project files where they are, connect their folders from Projects instead of copying.")}
         </CardDescription>
       </CardHeader>

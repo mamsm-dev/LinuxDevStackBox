@@ -3,11 +3,12 @@
  *
  * Registry of all shell types available in the universal terminal.
  *
- * How `initialCommand` works:
- *  The Rust backend ALWAYS spawns cmd.exe as the host process (with php/current
- *  and mysql/bin prepended to PATH). `initialCommand` is a string written to
- *  cmd.exe's stdin immediately after spawn - equivalent to the user typing it
- *  and pressing Enter. null means a plain cmd.exe prompt.
+ * How spawning works:
+ *  The Rust backend spawns the user's login shell ($SHELL) as the host
+ *  process, with the directories holding the distribution php and mysql
+ *  clients prepended to PATH. `initialCommand` is a string written to the
+ *  shell's stdin immediately after spawn - equivalent to the user typing it
+ *  and pressing Enter. null means a plain shell prompt.
  *
  */
 
@@ -19,12 +20,12 @@ import {
 } from "lucide-react";
 
 export interface ShellType {
-  id: "shell" | "powershell" | "cmd" | "php-cli" | "mysql-cli";
+  id: "shell" | "bash" | "php-cli" | "mysql-cli";
   label: string;
   icon: LucideIcon;
   /**
-   * Command written to cmd.exe stdin after spawn.
-   * null = plain cmd.exe prompt (no initial command sent).
+   * Command written to the shell's stdin after spawn.
+   * null = plain shell prompt (no initial command sent).
    */
   initialCommand: string | null;
 }
@@ -37,16 +38,10 @@ export const SHELL_TYPES: ShellType[] = [
     initialCommand: null,
   },
   {
-    id: "powershell",
-    label: "PowerShell",
+    id: "bash",
+    label: "Bash",
     icon: SquareTerminal,
-    initialCommand: "powershell",
-  },
-  {
-    id: "cmd",
-    label: "CMD",
-    icon: SquareTerminal,
-    initialCommand: null, // plain cmd.exe - identical to "shell" but semantically distinct
+    initialCommand: null, // plain login shell - identical to "shell" but semantically distinct
   },
   {
     id: "php-cli",

@@ -239,7 +239,7 @@ export function CommandPalette({
     {
       id: "nav-about",
       label: t(ROUTES.about.labelKey, ROUTES.about.defaultLabel),
-      description: "About DevStackBox",
+      description: "About LinuxDevStackBox",
       icon: Info,
       action: () => go(ROUTES.about.path),
       category: "Navigation",

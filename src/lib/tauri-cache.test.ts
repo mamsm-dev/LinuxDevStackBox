@@ -17,7 +17,7 @@ describe("native invocation caching", () => {
     expect(mocks.invoke).toHaveBeenCalledTimes(1);
     await safeInvoke("get_php_versions", undefined, {fresh: true});
     expect(mocks.invoke).toHaveBeenCalledTimes(2);
-    await safeInvoke("switch_php_version", {version:"8.4"});
+    await safeInvoke("restore_full_backup", {version:"8.4"});
     await safeInvoke("get_php_versions");
     expect(mocks.invoke).toHaveBeenCalledTimes(4);
   });

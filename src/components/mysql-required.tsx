@@ -29,7 +29,7 @@ export function MySQLRequired({ children }: { children: ReactNode }) {
                 : "MySQL is stopped"}
       </h2>
       <p className="text-sm text-muted-foreground">
-        Start DevStackBox MySQL to manage databases and users. Your saved
+        Start LinuxDevStackBox MySQL to manage databases and users. Your saved
         databases remain on this computer.
       </p>
       <div className="flex gap-2">

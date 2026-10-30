@@ -9,14 +9,14 @@ export function AppLogo({ className }: AppLogoProps) {
     <>
       <img
         src="/logo.svg"
-        alt="DevStackBox"
+        alt="LinuxDevStackBox"
         width={32}
         height={32}
         className={cn("h-8 w-8 dark:hidden", className)}
       />
       <img
         src="/logo-white.svg"
-        alt="DevStackBox"
+        alt="LinuxDevStackBox"
         width={32}
         height={32}
         className={cn("hidden h-8 w-8 dark:block", className)}

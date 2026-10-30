@@ -11,7 +11,7 @@ import { useLogStream, type LogCursor } from '@/hooks/use-log-stream';
 interface Policy { enabled: boolean; rotate_mib: number; retention_days: number; per_log: number; budget_mib: number; }
 interface ArchivedLog { id: string; source: string; created: number; original_bytes: number; bytes: number; sha256: string; }
 const size = (bytes: number) => bytes < 1024 ? `${bytes} B` : bytes < 1024 * 1024 ? `${(bytes / 1024).toFixed(1)} KiB` : `${(bytes / 1024 / 1024).toFixed(1)} MiB`;
-const labels: Record<string, string> = { apache: 'Apache error', 'apache-access': 'Apache access', mysql: 'MySQL error', php: 'PHP global error', crash: 'DevStackBox crash' };
+const labels: Record<string, string> = { apache: 'Apache error', 'apache-access': 'Apache access', mysql: 'MySQL error', php: 'PHP global error', crash: 'LinuxDevStackBox crash' };
 export function WorkspaceLogViewer({ service = 'apache', management = false }: { service?: 'apache' | 'mysql' | 'php'; management?: boolean }) {
   const inLogsWorkspace = useLocation().pathname.startsWith('/logs');
   const [selected, setSelected] = useState(service as string);
@@ -83,7 +83,7 @@ export function WorkspaceLogViewer({ service = 'apache', management = false }: {
     </section>}
     {panel === 'rotation' && <section className="space-y-4 rounded-lg border p-5">
       <h2 className="text-lg font-semibold">Rotation & retention</h2>
-      <p className="text-sm text-muted-foreground">One shared policy applies to all managed Apache, MySQL, PHP and DevStackBox diagnostic logs and archives. Automatic rotation waits for a safe shutdown of service writers; it never stops your services. Maintenance runs at launch, after service stops, and every five minutes while DevStackBox is open.</p>
+      <p className="text-sm text-muted-foreground">One shared policy applies to all managed Apache, MySQL, PHP and LinuxDevStackBox diagnostic logs and archives. Automatic rotation waits for a safe shutdown of service writers; it never stops your services. Maintenance runs at launch, after service stops, and every five minutes while LinuxDevStackBox is open.</p>
       {policy ? <form className="space-y-4" onSubmit={event => { event.preventDefault(); void run(async () => { await safeInvoke('set_log_policy', { value: policy }); setNotice('Log policy saved. Automatic archive deletion follows these limits only while enabled.'); }); }}>
         <label className="flex items-start gap-2 text-sm"><input type="checkbox" checked={policy.enabled} onChange={e => setPolicy({ ...policy, enabled: e.target.checked })} /><span>Enable automatic rotation and deletion of old managed archives</span></label>
         <div className="grid gap-4 sm:grid-cols-2">{([{ key: 'rotate_mib', label: 'Rotate at (MiB)', min: 1, max: 1024 }, { key: 'retention_days', label: 'Keep for (days)', min: 1, max: 3650 }, { key: 'per_log', label: 'Maximum archives per log', min: 1, max: 1000 }, { key: 'budget_mib', label: 'Total archive budget (MiB)', min: 10, max: 102400 }] as const).map(field => <label key={field.key} className="space-y-2 text-sm">{field.label}<Input type="number" required min={field.min} max={field.max} step={1} value={policy[field.key]} onChange={e => setPolicy({ ...policy, [field.key]: Number(e.target.value) })} /></label>)}</div>

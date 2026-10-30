@@ -1,5 +1,5 @@
 /**
- * Shared type definitions for DevStackBox services
+ * Shared type definitions for LinuxDevStackBox services
  */
 
 /**
@@ -55,7 +55,7 @@ export interface PHPVersionInfo {
   security_update_required?: boolean;
   end_of_life?: boolean;
   release_error?: string | null;
-  status: "installed" | "available" | "downloading";
+  status: "installed" | "available" | "downloading" | "missing";
   path: string;
   is_active: boolean;
   installed: boolean;

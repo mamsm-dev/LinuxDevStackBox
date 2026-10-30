@@ -82,7 +82,7 @@ describe("service availability and crash regression cases", () => {
     await act(async () => api.runBulk("stop")); expect(api.services.mysql.running).toBe(false);
     expect(mocks.toast).not.toHaveBeenCalled(); expect(host.textContent).toContain("MySQL is stopped");
   });
-  it("suppresses a deliberate stop when Windows reports process exit after Stop All returns", async () => {
+  it("suppresses a deliberate stop when the backend reports process exit after Stop All returns", async () => {
     running = true;
     await mount();
     mocks.invoke.mockImplementation(async (command: string) => {

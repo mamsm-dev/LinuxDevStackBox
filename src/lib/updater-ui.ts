@@ -24,7 +24,7 @@ export function isUpdaterProgressIndeterminate(
 export type UpdaterPrimaryButtonLabelKey =
   | "updater.restartAndUpdate"
   | "updater.retryUpdate"
-  | "updater.updateNow"
+  | "updater.getUpdate"
   | "updater.preparingShort"
   | "updater.downloadingShort"
   | "updater.pleaseWait"
@@ -49,7 +49,7 @@ export function primaryButtonLabelKey(options: {
 
   if (readyToInstall) return "updater.restartAndUpdate";
   if (checkError) return "updater.retryUpdate";
-  if (!downloading) return "updater.updateNow";
+  if (!downloading) return "updater.getUpdate";
 
   if (phase === "preparing") return "updater.preparingShort";
   if (phase === "installing") return "updater.installingShort";

@@ -37,9 +37,9 @@ interface AutoUpdaterProps {
 }
 
 const PRIMARY_LABEL_DEFAULTS: Record<UpdaterPrimaryButtonLabelKey, string> = {
-  "updater.restartAndUpdate": "Restart & Update",
-  "updater.retryUpdate": "Retry update",
-  "updater.updateNow": "Download & Install",
+  "updater.restartAndUpdate": "How to update",
+  "updater.retryUpdate": "Retry check",
+  "updater.getUpdate": "How to update",
   "updater.preparingShort": "Preparing…",
   "updater.downloadingShort": "Downloading…",
   "updater.installingShort": "Installing…",
@@ -123,7 +123,7 @@ export function AutoUpdater({ mode = "button" }: AutoUpdaterProps) {
     if (!updateAvailable) return null;
 
     const tooltip = updateInfo?.version
-      ? `DevStackBox v${updateInfo.version} ${t("updater.available", "available")} - ${t("updater.clickToUpdate", "click to update")}`
+      ? `LinuxDevStackBox v${updateInfo.version} ${t("updater.available", "available")} - ${t("updater.clickToUpdate", "click to update")}`
       : t("updater.updateAvailable", "Update available");
 
     return (
@@ -249,7 +249,7 @@ function UpdateDialog() {
           <DialogTitle className="flex items-center gap-2 min-w-0">
             <Download className="h-5 w-5 shrink-0" />
             <span className="truncate">
-              DevStackBox v{updateInfo?.version}{" "}
+              LinuxDevStackBox v{updateInfo?.version}{" "}
               {t("updater.available", "available")}
             </span>
           </DialogTitle>

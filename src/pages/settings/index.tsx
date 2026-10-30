@@ -32,7 +32,7 @@ import {
 
 interface SettingsPageProps {}
 
-const AUTO_CHECK_KEY = "devstackbox.settings.autoCheckUpdates";
+const AUTO_CHECK_KEY = "linuxdevstackbox.settings.autoCheckUpdates";
 
 export function SettingsPage({}: SettingsPageProps) {
   const { t, i18n } = useTranslation();
@@ -221,7 +221,7 @@ export function SettingsPage({}: SettingsPageProps) {
           <CardDescription>
             {t(
               "settings.startupDesc",
-              "Control whether DevStackBox launches when you sign in.",
+              "Control whether LinuxDevStackBox launches when you sign in.",
             )}
           </CardDescription>
         </CardHeader>
@@ -234,7 +234,7 @@ export function SettingsPage({}: SettingsPageProps) {
               <div className="text-xs text-muted-foreground">
                 {t(
                   "settings.autostartDesc",
-                  "Adds a Windows registry entry under HKCU Run. No admin needed.",
+                  "Adds an XDG autostart desktop entry for your user. No admin needed.",
                 )}
               </div>
             </div>
@@ -256,7 +256,7 @@ export function SettingsPage({}: SettingsPageProps) {
           <CardDescription>
             {t(
               "settings.updatesDesc",
-              "DevStackBox can quietly check GitHub Releases for new versions.",
+              "LinuxDevStackBox can quietly check GitHub Releases for new versions.",
             )}
           </CardDescription>
         </CardHeader>
@@ -327,7 +327,7 @@ export function SettingsPage({}: SettingsPageProps) {
           <CardDescription>
             {t(
               "settings.servicesDesc",
-              "Automatically start selected services when DevStackBox opens. Applies on next launch.",
+              "Automatically start selected services when LinuxDevStackBox opens. Applies on next launch.",
             )}
           </CardDescription>
         </CardHeader>
@@ -340,7 +340,7 @@ export function SettingsPage({}: SettingsPageProps) {
               <div className="text-xs text-muted-foreground">
                 {t(
                   "settings.autoStartApacheDesc",
-                  "Start the HTTP server when DevStackBox launches.",
+                  "Start the HTTP server when LinuxDevStackBox launches.",
                 )}
               </div>
             </div>
@@ -360,7 +360,7 @@ export function SettingsPage({}: SettingsPageProps) {
               <div className="text-xs text-muted-foreground">
                 {t(
                   "settings.autoStartMysqlDesc",
-                  "Start the database server when DevStackBox launches.",
+                  "Start the database server when LinuxDevStackBox launches.",
                 )}
               </div>
             </div>
