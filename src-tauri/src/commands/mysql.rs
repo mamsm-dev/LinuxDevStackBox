@@ -130,6 +130,9 @@ pub async fn start_mysql() -> Result<bool, String> {
 
     match create_service_command(mysql_path.as_os_str())
         .arg(format!("--defaults-file={}", config_path.display()))
+        .stdin(std::process::Stdio::null())
+        .stdout(std::process::Stdio::null())
+        .stderr(std::process::Stdio::null())
         .spawn()
     {
         Ok(child) => {

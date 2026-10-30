@@ -9,7 +9,7 @@
 
 import { createHash } from "node:crypto";
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
-import { dirname, join, resolve } from "node:path";
+import { basename, dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
@@ -72,7 +72,7 @@ if (!artifacts.length) {
   console.error("No built packages found. Run scripts/build-release.mjs first.");
   process.exit(1);
 }
-const hashes = artifacts.map((p) => [path.basename(p), hashFile(p)]);
+const hashes = artifacts.map((p) => [basename(p), hashFile(p)]);
 
 const notes = injectSha(section, hashes);
 if (!args.notesOnly) {

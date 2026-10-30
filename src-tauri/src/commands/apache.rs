@@ -313,6 +313,9 @@ pub async fn start_apache() -> Result<bool, String> {
         .arg("-f")
         .arg(&config_path)
         .env("PHPRC", user_config_dir())
+        .stdin(std::process::Stdio::null())
+        .stdout(std::process::Stdio::null())
+        .stderr(std::process::Stdio::null())
         .spawn()
     {
         Ok(c) => c,
@@ -473,7 +476,7 @@ SetEnv PHPRC "{user_config}/"
 
 <Directory "{php_cgi_dir_str}">
     AllowOverride None
-    Options ExecCGI
+    Options ExecCGI FollowSymLinks
     Require all granted
 </Directory>
 

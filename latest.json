@@ -1,5 +1,5 @@
 {
   "version": "0.1.22",
-  "notes": "LinuxDevStackBox 0.1.22 - first Linux-only release: distribution-managed Apache, MariaDB/MySQL and PHP, per-user XDG configuration, trusted local HTTPS via the system trust store, .deb, .rpm and Arch packages.",
-  "pub_date": "2026-10-30T00:00:00Z"
+  "notes": "\n### Changed\n\n- Bundle PHP **8.3.36-1** with verified `.devstackbox-release.json` so fresh installs match the Windows package revision feed and avoid spurious bundled update prompts.\n\n### Fixed\n\n- Improve stopped-status, secondary-text, disabled-control and switch contrast in light and dark themes.\n- Share stable PHP/configuration reads across tabs, deduplicate concurrent calls and invalidate affected data after changes. Explicit Refresh/Reload bypass cached reads; live service, database and log checks remain active.\n\n**Installer SHA-256:** `D9F54708F067AA7CA73C6C4348E49A09EAB2B2E70544C4C5ACA0E9DFFCFADB3B`",
+  "pub_date": "2026-10-30T22:16:14.336Z"
 }

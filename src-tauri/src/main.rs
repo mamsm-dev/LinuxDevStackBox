@@ -34,6 +34,13 @@ fn main() {
         std::process::exit(if result.is_ok() {0} else {1});
     }
 
+    if std::env::args().any(|arg| arg == "--start-services") {
+        let result = tauri::async_runtime::block_on(linuxdevstackbox_lib::commands::system::start_all_services());
+        match result {
+            Ok(summary) => { println!("{summary}"); std::process::exit(0); }
+            Err(error) => { println!("ERROR: {error}"); std::process::exit(1); }
+        }
+    }
     if std::env::args().any(|arg| arg == "--stop-services") {
         let result = tauri::async_runtime::block_on(linuxdevstackbox_lib::commands::system::stop_all_services());
         std::process::exit(if result.is_ok() { 0 } else { 1 });
