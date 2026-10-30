@@ -1,21 +1,24 @@
 ---
 title: "Environment & Networking"
-description: "Ports, localhost binding, and network configuration."
+description: "Ports, localhost binding, environment variables, and privilege separation."
 icon: "Network"
 ---
-# DevStackBox - Networking Reference
+# LinuxDevStackBox - Environment Reference
 
-**Ports, conflicts, firewall behavior, and localhost configuration.**
+**Ports, conflicts, environment variables, privilege separation, and localhost configuration.**
 
 ---
 
 ## Default Ports
 
-| Service     | Default Port                       | Config File         | Config Key    |
-| ----------- | ---------------------------------- | ------------------- | ------------- |
-| Apache HTTP | 80                                 | `config/httpd.conf` | `Listen 80`   |
-| MySQL       | 3306                               | `config/my.cnf`     | `port = 3306` |
-| phpMyAdmin  | (served through Apache on port 80) | -                   | -             |
+| Service     | Default Port                        | Config File                       | Config Key        |
+| ----------- | ----------------------------------- | --------------------------------- | ----------------- |
+| Apache HTTP | 8080 (unprivileged)                 | `~/.config/linuxdevstackbox/httpd.conf` | `Listen 127.0.0.1:8080` |
+| MySQL       | 3306                                | `~/.config/linuxdevstackbox/my.cnf`     | `port = 3306`     |
+| HTTPS       | 443                                 | managed via the app's SSL controls | -                 |
+| phpMyAdmin  | (served through Apache on port 8080) | -                                | -                 |
+
+Apache defaults to 8080 because it runs unprivileged - no root rights are needed to serve HTTP on a high port.
 
 ---
 
@@ -33,65 +36,79 @@ This means:
 
 ---
 
+## Environment Variables
+
+| Variable                    | Effect |
+| --------------------------- | ------ |
+| `LINUXDEVSTACKBOX_DATA_DIR` | Relocates both user roots together: the config root and the data root become `<dir>` and `<dir>/config` |
+| `XDG_CONFIG_HOME`           | Standard XDG base directory; the config root defaults to `$XDG_CONFIG_HOME/linuxdevstackbox` (`~/.config/linuxdevstackbox`) |
+| `XDG_DATA_HOME`             | Standard XDG base directory; the data root defaults to `$XDG_DATA_HOME/linuxdevstackbox` (`~/.local/share/linuxdevstackbox`) |
+
+The data root holds `logs/`, `mysql-data/`, `www/`, `backups/`, `config-backups/`, the writable phpMyAdmin copy and the staged `cgi-bin/`. The config root holds `httpd.conf`, `my.cnf`, `php.ini`, `vhosts.json`, the `https/` material and the 0600 MySQL root credentials file.
+
+---
+
+## Privilege Separation and CLI Flags
+
+The GUI never runs as root. Exactly two operations are elevated, each a single fixed-argument `pkexec` invocation of the app binary itself (you will see a Polkit authentication prompt):
+
+- `--hosts-operation add|remove <domain>` - edits `/etc/hosts` for virtual hosts
+- `--ca-trust-operation install|remove` - installs or removes the local CA anchor in the distribution trust store and refreshes it
+
+Other CLI flags (no elevation):
+
+- `--setup-local-https` - provision local HTTPS
+- `--https-status` - print HTTPS status
+- `--start-apache` - start Apache
+- `--stop-services` - stop all managed services
+
+Process safety: a running service counts as "ours" only when its command line references the app's generated config (`httpd.conf` / `my.cnf`). System services are never touched or stopped by LinuxDevStackBox.
+
+---
+
 ## Common Port Conflicts
 
-### Port 80 Already in Use
+### Port 8080 Already in Use
 
-Port 80 is blocked when another service is running on it.
+**Typical culprits:**
 
-**Typical culprits on Windows:**
-
-| Service                             | How to Check                    | How to Stop                   |
-| ----------------------------------- | ------------------------------- | ----------------------------- |
-| IIS (Internet Information Services) | `netstat -ano` | Services → IIS → Stop |
-| World Wide Web Publishing Service   | Task Manager → Services         | `net stop W3SVC`              |
-| Skype (older versions)              | Skype Settings → Advanced       | Uncheck "use port 80 and 443" |
-| Windows 10/11 Device Portal         | Check Settings → Developer Mode | Disable Device Portal         |
-| Another XAMPP / WAMP                | Check system tray               | Stop the other stack          |
-
-**DevStackBox error message when port 80 is busy:** `Port 80 is not available. Another service may be using it.`
+| Service                             | How to Check                | How to Stop                      |
+| ----------------------------------- | --------------------------- | -------------------------------- |
+| System Apache (httpd/apache2)       | `systemctl status httpd apache2` | `sudo systemctl stop httpd apache2` |
+| Another local dev stack             | `ss -ltnp`                  | Stop the other stack             |
+| Any other process                   | `ss -ltnp 'sport = :8080'`  | Stop that process                |
 
 **Fix:**
 
-1. Find what is using port 80: `netstat -ano | findstr :80`
-2. Note the PID in the last column
-3. Find the process: `tasklist | findstr <PID>`
-4. Stop that service
-5. Try starting Apache again
+1. Find what is listening: `ss -ltnp | grep 8080`
+2. Stop that service (prefer `systemctl` for system services)
+3. Try starting Apache again
 
-Or change Apache's port in `config/httpd.conf`:
+Or change Apache's port in the generated `httpd.conf` (or the app's port setting):
 
 ```
-Listen 8080
+Listen 127.0.0.1:8081
 ```
 
-Note: changing the port means phpMyAdmin URL becomes `http://localhost:8080/phpmyadmin/`
-
----
+Note: changing the port means the phpMyAdmin URL changes too, for example `http://localhost:8081/phpmyadmin/`.
 
 ### Port 3306 Already in Use
 
 **Typical culprits:**
 
-| Service                | How to Stop                             |
-| ---------------------- | --------------------------------------- |
-| Another MySQL instance | Stop it via Services or its own manager |
-| Another XAMPP          | Stop XAMPP MySQL                        |
-| Docker MySQL container | `docker stop <container>`               |
+| Service                        | How to Stop                             |
+| ------------------------------ | --------------------------------------- |
+| System MariaDB/MySQL service   | `sudo systemctl stop mariadb` (or `mysqld`) |
+| Docker MySQL container         | `docker stop <container>`               |
+| Another local dev stack        | Stop the other stack                    |
 
 **Fix:**
 
-```powershell
-netstat -ano | findstr :3306
+```bash
+ss -ltnp | grep 3306
 ```
 
-Note PID, then:
-
-```powershell
-tasklist | findstr <PID>
-```
-
-Or change MySQL's port in `config/my.cnf`:
+Or change MySQL's port in the generated `my.cnf`:
 
 ```ini
 [mysqld]
@@ -104,103 +121,60 @@ Note: changing the port means you must connect phpMyAdmin to the new port.
 
 ## Firewall Behavior
 
-Windows Defender Firewall may prompt to allow Apache and MySQL on first launch.
+Services bind to loopback only, so most desktop firewalls require no changes. If you reconfigure a service to listen on an external interface, you may need to allow the port explicitly:
 
-**Expected behavior:**
+- firewalld (Fedora family): `sudo firewall-cmd --add-port=8080/tcp`
+- ufw (Debian family): `sudo ufw allow 8080/tcp`
 
-- First time Apache starts: Windows Firewall dialog asks "Allow httpd.exe to communicate on network?"
-- Click "Allow access" - only for Private networks, NOT public networks
-- Same for MySQL's `mysqld.exe`
-
-If you accidentally deny the firewall prompt:
-
-1. Open Windows Defender Firewall → Advanced Settings
-2. Find the blocked rule for `httpd.exe` or `mysqld.exe`
-3. Enable it
-
----
-
-## IIS Conflict (Common on Developer Machines)
-
-IIS (Internet Information Services) is common on Windows developer machines and directly conflicts with Apache on port 80.
-
-**Disable IIS completely:**
-
-```powershell
-# Run as Administrator
-Disable-WindowsOptionalFeature -Online -FeatureName IIS-WebServer
-```
-
-**Or just stop IIS temporarily:**
-
-```powershell
-net stop W3SVC
-net stop WAS
-```
-
-**Re-enable IIS later:**
-
-```powershell
-net start W3SVC
-```
+Do not open these ports to untrusted networks - this is a local development stack.
 
 ---
 
 ## Accessing phpMyAdmin
 
-URL: `http://localhost/phpmyadmin/`
+URL: `http://localhost:8080/phpmyadmin/`
 
 Default credentials:
 
 - Username: `root`
 - Password: (empty)
 
-DevStackBox ships `phpmyadmin/config.inc.php` with `AllowNoPassword` enabled for this local default. If login says "Login without a password is forbidden", restart the app once (it recreates a missing config) or reinstall from the latest release.
-
 If phpMyAdmin shows "Cannot connect to MySQL server":
 
-1. Check MySQL is running (green status in DevStackBox)
-2. Check `phpmyadmin/config.inc.php` - `$cfg['Servers'][$i]['host']` should be `127.0.0.1`
+1. Check MySQL is running (green status in LinuxDevStackBox)
+2. Check the phpMyAdmin config in the data root copy - `$cfg['Servers'][$i]['host']` should be `127.0.0.1`
 3. Check MySQL port is 3306 (default)
 
 ---
 
 ## Localhost DNS Behavior
 
-`localhost` resolves to `127.0.0.1` via the Windows `hosts` file:
+`localhost` resolves to `127.0.0.1` via `/etc/hosts`:
 
 ```
 127.0.0.1   localhost
 ```
 
-This file is at: `C:\Windows\System32\drivers\etc\hosts`
-
-DevStackBox does NOT modify this file unless you use the virtual hosts feature (Phase 3). The base `localhost` always works via Windows default.
-
----
-
-## Virtual hosts
-
-Virtual-host management is available in the app. Add a local domain and document root from the Apache workspace. Updating the Windows hosts file requires elevation. Review the requested changes before accepting a UAC prompt.
+LinuxDevStackBox does NOT modify this file unless you use the virtual hosts feature. Adding or removing a virtual-host domain runs the app binary once under `pkexec` (`--hosts-operation add|remove <domain>`) and shows a Polkit prompt. Review the requested domain before accepting the prompt.
 
 ## HTTPS / SSL
 
-Localhost SSL is available through the app's SSL controls. DevStackBox creates a local CA and localhost certificate; trusting the CA in Windows is a separate user action. Per-virtual-host HTTPS remains planned. See [Feature status](../feature-status) for current scope.
+Localhost SSL is available through the app's SSL controls. LinuxDevStackBox creates a local CA and localhost certificate with the system `openssl`; trusting the CA installs it into the distribution trust store via a single `pkexec` invocation (`--ca-trust-operation install`) and refreshes the store. Per-virtual-host HTTPS remains planned. See [Feature status](../feature-status) for current scope.
 
 ## Network Diagnostics
 
-Quick commands to check port state from PowerShell:
+Quick commands to check port state:
 
-```powershell
-# Check what is listening on port 80
-netstat -ano | findstr ":80 "
+```bash
+# Check what is listening on port 8080
+ss -ltnp 'sport = :8080'
 
 # Check what is listening on port 3306
-netstat -ano | findstr ":3306 "
+ss -ltnp 'sport = :3306'
 
 # List all listening TCP ports
-netstat -an | findstr LISTENING
+ss -ltn
 
 # Find which process owns a PID
-tasklist /FI "PID eq <PID>"
+ps -p <PID> -o pid,cmd
 ```

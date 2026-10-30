@@ -1,63 +1,53 @@
 ---
 title: "Upgrading"
-description: "Upgrade DevStackBox in place without losing your data."
+description: "Upgrade LinuxDevStackBox without losing your data."
 icon: "ArrowUpCircle"
 since: "0.1.8"
 ---
 
-# Upgrade DevStackBox
+# Upgrade LinuxDevStackBox
 
-DevStackBox upgrades preserve user data in `%LOCALAPPDATA%\devstackbox\`. Your configs, logs, and MySQL data live there - not in the install directory. Web projects stay under `C:\devstackbox\www` by default.
+LinuxDevStackBox upgrades preserve user data. Configs, HTTPS certificates and `vhosts.json` live in `~/.config/linuxdevstackbox`; logs, MySQL data, backups and web projects live in `~/.local/share/linuxdevstackbox/www` and siblings. Neither directory is touched by reinstalling the app package or by uninstalling.
 
-From **v0.1.11**, the installer ships **MySQL 8.4 LTS**. There is no automatic MySQL 8.0→8.4 conversion tool. Back up databases before updating; if MySQL will not start after an update, export SQL from a backup or start with a fresh `mysql-data` folder (see [Troubleshooting](../advanced/troubleshooting)).
+Because Apache, MariaDB/MySQL and PHP come from your distribution, keep them current with your normal system updates. When a database-server package upgrade is involved, back up your databases first; see [Troubleshooting](../advanced/troubleshooting) if MySQL will not start after a system update.
 
 ## Check for updates in the app
 
-DevStackBox can check GitHub Releases for a newer version:
+LinuxDevStackBox checks GitHub Releases for a newer version:
 
 1. Open **Settings → Updates**.
 2. Turn on **Auto-check updates** (stored in `localStorage` as `devstackbox.settings.autoCheckUpdates`).
 3. When enabled, the app checks on launch (after a short delay) and every 6 hours.
 4. Use **Check for updates** on the About page for a manual check.
 
-When an update is available, the header shows an indicator. Use **Download and install** (or **Restart & update** after download completes) on the About page - the app downloads the signed NSIS installer, verifies it, runs it with UAC, and relaunches. When you are already on the latest release, a manual check shows an “up to date” message.
+When an update is available, the header shows an indicator and the app displays the new version with upgrade instructions for your package manager. There is no self-install on Linux. When you are already on the latest release, a manual check shows an "up to date" message.
 
-## In-app auto-update (recommended)
-
-As of v0.1.8+, this is the normal upgrade path when **Auto-check updates** is enabled (default on):
-
-1. Open DevStackBox - a check runs shortly after launch, then every 6 hours while the app is open.
-2. When a newer version is available, confirm the update dialog and allow UAC when prompted.
-3. After install, the app relaunches; your data under `%LOCALAPPDATA%\DevStackBox\` is preserved.
-
-Back up projects and export databases before updating. The v0.1.12 installer stops processes owned by the selected installation and checks replaceable binaries for locks before copying. If a file stays locked, setup aborts; close the reported process and retry.
-
-## Manual upgrade (fallback)
-
-If auto-update fails or you prefer a browser download, install a newer release over the existing install:
+## Upgrade with your package manager (recommended)
 
 1. **Stop services** - stop Apache and MySQL from the dashboard or tray menu.
-2. **Back up first** - use **Settings → Backup & Restore** to create a full backup, or back up both your install folder’s `www` and `%LOCALAPPDATA%\DevStackBox\`. Connected projects outside `www` keep their files in their original folders; back up those folders separately because full backups do not include their contents.
-3. **Download** the latest Windows installer from [devstackbox.com/download](https://www.devstackbox.com/download) or [GitHub Releases](https://github.com/DevStackBox/DevStackBox/releases/latest).
-4. **Run the installer** - accept the UAC prompt. Choose the same install directory as before (default: `C:\devstackbox`).
-5. **Launch DevStackBox** - start services and confirm your sites and databases are intact.
+2. **Back up first** - use **Settings → Backup & Restore** to create a full backup. Connected projects outside `www` keep their files in their original folders; back up those folders separately because full backups do not include their contents.
+3. **Download** the newer package from [GitHub Releases](https://github.com/mamsm-dev/LinuxDevStackBox/releases/latest) - or receive it through your AUR helper/repository if you installed it that way.
+4. **Reinstall the package**:
+   - **Arch:** `sudo pacman -U ./linuxdevstackbox-*.pkg.tar.zst`
+   - **Debian/Ubuntu:** `sudo apt install ./linuxdevstackbox_*.deb`
+   - **Fedora:** `sudo dnf install ./linuxdevstackbox-*.rpm`
+
+   Reinstalling the newer package upgrades the app in place.
+5. **Launch LinuxDevStackBox** - start services and confirm your sites and databases are intact.
 
 Your user data layout:
 
 ```
-%LOCALAPPDATA%\DevStackBox\
-  config\           Apache, MySQL, PHP configs
-  config-backups\   timestamped backups
-  logs\             service logs
-  mysql-data\       MySQL database files
-  backups\          app-created backups
+~/.config/linuxdevstackbox/        Apache, MySQL, PHP configs, vhosts.json, HTTPS certificates
+~/.local/share/linuxdevstackbox/
+  logs/             service logs
+  mysql-data/       MySQL database files
+  www/              web root holding projects
+  backups/          app-created backups
+  phpmyadmin/       writable copy of the bundled phpMyAdmin
 ```
 
-Binaries under the install directory (Apache, PHP, MySQL, phpMyAdmin) are replaced by the installer; the user data folder is not.
-
-## What is coming next
-
-Signed download-and-install via the Tauri updater is **shipped** today. Version 0.1.12 adds automatic service shutdown and lock checks before manual upgrades. Final clean-machine and cross-account qualification remains part of release testing. See [Installer & updates](../reference/installer) and [Release process](../development/release-process).
+The app package is replaced by the upgrade; the config and data directories are not.
 
 ## If something goes wrong
 
@@ -68,5 +58,5 @@ Signed download-and-install via the Tauri updater is **shipped** today. Version 
 ## Related
 
 - [Installation](installation) - first-time setup
-- [Installer reference](../reference/installer) - NSIS/MSI and update architecture
+- [Installer reference](../reference/installer) - packaging and update architecture
 - [Feature status](../feature-status) - what is shipped vs planned

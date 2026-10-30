@@ -18,7 +18,7 @@ Use Tailwind CSS for utility-based styling and shadcn/ui for component primitive
 
 ## Context
 
-DevStackBox needs a consistent, maintainable UI with:
+LinuxDevStackBox needs a consistent, maintainable UI with:
 
 - Dark and light mode support
 - Accessible components (dialogs, menus, tooltips)
@@ -56,3 +56,9 @@ DevStackBox needs a consistent, maintainable UI with:
 - The `src/components/ui/` directory is auto-generated. Do NOT manually edit files there.
 - Dark mode is implemented via Tailwind's `dark:` prefix. Every new UI element must include `dark:` variants.
 - Framer Motion is used for all animations (ADR 001 note: CSS animations are not used).
+
+---
+
+## Linux migration update (2026)
+
+The decision is unaffected by the Windows-to-Linux migration. The styling stack (Tailwind CSS, shadcn/ui, Framer Motion) is WebView-based and identical on WebKitGTK: no platform-specific CSS or component changes were needed. The `npx shadcn add` workflow, the `dark:` variant rule and the "no custom CSS" rule all continue to apply.

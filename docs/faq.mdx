@@ -1,16 +1,20 @@
 ---
 title: "FAQ"
-description: "Frequently asked questions about DevStackBox."
+description: "Frequently asked questions about LinuxDevStackBox."
 icon: "HelpCircle"
 ---
 
-## What is DevStackBox?
+## What is LinuxDevStackBox?
 
-DevStackBox is a free XAMPP alternative for Windows. One installer includes Apache, MySQL 8.4 LTS, phpMyAdmin, and PHP 8.3.
+LinuxDevStackBox is a free XAMPP alternative for Linux. It manages Apache, MySQL/MariaDB, phpMyAdmin, and PHP as a local development stack. Apache, the database server, and PHP come from your distribution's packages; the app starts, stops and configures them for you.
+
+## Which distributions are supported?
+
+Arch (and derivatives), Debian (and derivatives), and Fedora (and derivatives). The app detects your package family and prints the matching install command when a required binary is missing.
 
 ## Which PHP versions are included?
 
-**PHP 8.3** ships in the installer. **PHP 8.2, 8.4, and 8.5** are available under **Services → PHP → Versions** (download, then switch). PHP 8.5 is the newest supported branch. PHP Version Manager shows both the branch (for example, 8.5) and the full patch version (for example, 8.5.12). PHP 8.1 is end-of-life and has been removed from the version manager. Existing project selections must be migrated to a supported branch. Existing supported branches can be patched with the Update button after stopping Apache and closing PHP processes.
+LinuxDevStackBox uses the single PHP runtime installed by your distribution (minimum supported version 8.2). There is no bundled PHP, no version download, and no version switching. Upgrading PHP means upgrading your distribution's `php` package; the app then reports the new version.
 
 ## Why does Laravel return an Apache 500 error?
 
@@ -18,31 +22,36 @@ Check the exact Apache log entry. If it names a parent .htaccess with `<IfModule
 
 ## Do updates preserve my php.ini changes?
 
-The editor uses a persistent user copy. Custom upload, memory and timeout limits are preserved; app-managed runtime paths and error/log settings may be normalized. See [Configuration](reference/configuration).
+The editor uses a persistent user copy at `~/.config/linuxdevstackbox/php.ini`. Custom upload, memory and timeout limits are preserved; app-managed runtime paths and error/log settings may be normalized. See [Configuration](reference/configuration).
 
-## Is DevStackBox free?
+## Is LinuxDevStackBox free?
 
-Yes. DevStackBox is MIT-licensed open source. There is no paid tier.
+Yes. LinuxDevStackBox is MIT-licensed open source. There is no paid tier.
 
-## Where does DevStackBox install?
+## Where does LinuxDevStackBox install?
 
-The application installs to `C:\devstackbox` by default (you can choose another path). User data - configs, logs, and MySQL files - is stored in `%LOCALAPPDATA%\devstackbox\`. Web projects use `C:\devstackbox\www` by default.
+LinuxDevStackBox follows the XDG Base Directory Specification:
+
+- Config lives in `~/.config/linuxdevstackbox` (`httpd.conf`, `my.cnf`, `php.ini`, `vhosts.json`, HTTPS certificates).
+- Data lives in `~/.local/share/linuxdevstackbox` (`logs/`, `mysql-data/`, `www/`, `backups/`, and the writable `phpmyadmin/` copy).
+
+Both locations can be redirected with the `LINUXDEVSTACKBOX_DATA_DIR` environment variable.
 
 ## Must projects live in www?
 
-No. Connect an accessible local folder in Projects without moving files. New folders use www by default. Open connected sites through their configured hostnames. Full backups do not include external project file contents; back them up separately.
+No. Connect an accessible local folder in Projects without moving files. New folders use `~/.local/share/linuxdevstackbox/www` by default. Open connected sites through their configured hostnames. Full backups do not include external project file contents; back them up separately.
 
 ## Can I move projects from XAMPP?
 
-Yes. Connect an existing project folder from **Projects** to keep files where they are, or use **Settings → Import from XAMPP** to copy `htdocs` into DevStackBox `www`. Export databases from XAMPP phpMyAdmin and import them in DevStackBox if needed.
+Yes. Connect an existing project folder from **Projects** to keep files where they are, or use **Settings → Import from XAMPP** to copy `htdocs` from `/opt/lampp` into LinuxDevStackBox `www`. Export databases from XAMPP phpMyAdmin and import them in LinuxDevStackBox if needed.
 
-## Does DevStackBox collect telemetry?
+## Does LinuxDevStackBox collect telemetry?
 
-No. DevStackBox does not collect usage data or phone home. See the [Privacy Policy](/privacy).
+No. LinuxDevStackBox does not collect usage data or phone home. See the [Privacy Policy](/privacy).
 
 ## How do I report a bug?
 
-Open a [GitHub Issue](https://github.com/DevStackBox/DevStackBox/issues) or start a [Discussion](https://github.com/DevStackBox/DevStackBox/discussions).
+Open a [GitHub Issue](https://github.com/mamsm-dev/LinuxDevStackBox/issues) or start a [Discussion](https://github.com/mamsm-dev/LinuxDevStackBox/discussions).
 
 ## How do I report a security issue?
 
@@ -50,16 +59,14 @@ Email **hello@devstackbox.com**. Do not open public issues for vulnerabilities. 
 
 ## Can each project use a different PHP version?
 
-Yes, in v0.1.12. Download the runtime in PHP Versions, then select it in project details. Only installed runtimes are offered. This affects website requests; the terminal still uses global PHP. See [Projects, PHP & HTTPS](getting-started/projects).
+No. There is one system PHP runtime, and every website and terminal session uses it. To run a newer PHP, upgrade your distribution's `php` package. See [Projects, PHP & HTTPS](getting-started/projects).
 
 ## Can a trusted HTTPS site return 404?
 
 Yes. A certificate verifies the connection, not application routes or files. Check the document root and entry file in project details.
 
-## Why does Windows SmartScreen warn about the installer?
+## Why does my browser or package manager warn about the package?
 
-DevStackBox is not signed with a Windows Authenticode publisher certificate. SmartScreen may label the installer as from an **unknown publisher**. That is expected for open-source projects without a commercial code-signing cert.
+LinuxDevStackBox packages are built and published as an open-source project without a commercial code-signing certificate. That is expected.
 
-The in-app updater uses a separate **minisign** signature on release assets. That proves update packages came from the project; it does **not** replace Windows publisher trust for the first install.
-
-**What to do:** Download only from the [official GitHub release](https://github.com/DevStackBox/DevStackBox/releases/latest). Compare the installer SHA-256 with the hash on the [download page](https://www.devstackbox.com/download) (from GitHub) or in `CHANGELOG.md`. If SmartScreen still blocks you, choose **More info** → **Run anyway** after you trust the hash and source.
+**What to do:** Download packages only from the [official GitHub release](https://github.com/mamsm-dev/LinuxDevStackBox/releases/latest) and install them with your package manager (`sudo pacman -U`, `sudo apt install ./...`, `sudo dnf install ./...`), which performs its own package integrity checks. Compare the package with the hash on the release page if you want extra assurance.

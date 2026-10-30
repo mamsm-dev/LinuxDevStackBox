@@ -43,7 +43,6 @@ import { useTranslation } from "react-i18next";
 
 // Minimal shape of the object returned by the backend update check
 interface UpdateCheckMetadata {
-  rid: number;
   currentVersion: string;
   version: string;
   body?: string;

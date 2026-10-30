@@ -3,7 +3,7 @@ title: "Feature Status"
 description: "Shipped, partial, and planned features."
 icon: "ListChecks"
 ---
-# DevStackBox - Feature Status
+# LinuxDevStackBox - Feature Status
 
 **THE single source of truth for what is built, what is in progress, and what is planned.**  
 Reflects **v0.1.22**. Check the release notes for changes in a particular version.
@@ -15,11 +15,11 @@ Reflects **v0.1.22**. Check the release notes for changes in a particular versio
 
 ## v0.1.19 logs, cache and packaging
 
-Shared log viewer supports Clear view, verified GZIP archives, export, typed delete confirmation, and opt-in rotation settings; Logs workspace adds Archives & rotation. Workspace cache reduces blank reloads on Projects, Databases, and Users. Installer ships a policy-staged phpMyAdmin payload with pmahomme only and adds `bin/php.exe` to PATH. Live Apache/MySQL rotation while services run remains future work.
+Shared log viewer supports Clear view, verified GZIP archives, export, typed delete confirmation, and opt-in rotation settings; Logs workspace adds Archives & rotation. Workspace cache reduces blank reloads on Projects, Databases, and Users. The package ships a policy-staged phpMyAdmin payload with pmahomme only. Live Apache/MySQL rotation while services run remains future work.
 
 ## v0.1.18 database workspace
 
-Three-tab workspace for local MySQL: database list and details, user accounts with database permissions, and Import & Export (SQL, GZIP, single-SQL ZIP and DevStackBox ZIP packages), saved backups with integrity checks, activity history, and full-server backup. Ordinary ZIP imports require exactly one SQL file at the archive root; DevStackBox packages restore their recorded database names. Copy/migrate, remote transfer, and account rename remain deferred.
+Three-tab workspace for local MySQL: database list and details, user accounts with database permissions, and Import & Export (SQL, GZIP, single-SQL ZIP and LinuxDevStackBox ZIP packages), saved backups with integrity checks, activity history, and full-server backup. Ordinary ZIP imports require exactly one SQL file at the archive root; LinuxDevStackBox packages restore their recorded database names. Copy/migrate, remote transfer, and account rename remain deferred.
 
 ## v0.1.17 Apache compatibility
 
@@ -29,9 +29,9 @@ The explicit directory-override baseline prevents ancestor .htaccess failures wh
 
 v0.1.16 added streamed SQL restore, streamed backups and preservation-aware import-limit migration. v0.1.15 corrected updater download progress.
 
-## PHP security
+## PHP runtime
 
-Patched PHP 8.3.36-1 is bundled (PHP_VERSION reports 8.3.36; package revision is tracked in `.devstackbox-release.json`). The version manager shows exact patch versions, updates installed branches, and offers PHP 8.2 through 8.5. PHP 8.1 has been removed. Apache startup checks active and project-pinned runtime security baselines.
+PHP is the single system runtime from the distribution (minimum supported version 8.2). There is no bundled PHP, no version download and no version switching; security patches arrive through normal distribution updates. The app reports the actual runtime version from `php --version` rather than treating a branch label as a complete version.
 
 ## Diagnostics
 
@@ -42,7 +42,7 @@ Project details can read Apache and runtime-specific PHP errors. Configuration c
 | Phase                        | Status | Notes                                                                                                                                                                                                                                                     |
 | ---------------------------- | ------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Phase 1 - Core Stability     | DONE   | Items 1.1-1.8 complete. `cargo check` is clean; current toolchain clippy follow-up is tracked in advanced/troubleshooting ISSUE-017.                                                                                                                               |
-| Phase 1.8 - User Data Root   | DONE   | Runtime data now lives in `%LOCALAPPDATA%\DevStackBox\` (override via `DEVSTACKBOX_DATA_DIR`).                                                                                                                                                            |
+| Phase 1.8 - User Data Root   | DONE   | Config lives in `~/.config/linuxdevstackbox/`, runtime data in `~/.local/share/linuxdevstackbox/` (override via `LINUXDEVSTACKBOX_DATA_DIR`).                                                                                                                  |
 | Phase 2 - Modularize Backend | DONE   | `lib.rs` reduced to ~150 lines. Commands split into `commands/{mysql,apache,php,config,logs,system,tray}.rs`; helpers in `utils/{paths,process}.rs`; shared types in `types.rs`; default web templates in `src-tauri/templates/`. Build check clean.        |
 
 ---
@@ -70,13 +70,14 @@ Project details can read Apache and runtime-specific PHP errors. Configuration c
 | i18next (EN + HI)              | DONE   | `locales/en.json` and `locales/hi.json`                                                                                                             |
 | Dark / Light mode              | DONE   | Tailwind + shadcn theme system                                                                                                                      |
 | safeInvoke() wrapper           | DONE   | Browser mode fallback works                                                                                                                         |
-| MSI installer                  | PLANNED | Not configured as a release target                                                                                                                                            |
-| NSIS installer                 | PARTIAL | Built and installed locally; Authenticode signing and clean-machine validation remain                                                                                                                                            |
+| Arch PKGBUILD                  | DONE   | Builds `linuxdevstackbox-<ver>-x86_64.pkg.tar.zst`; install with `sudo pacman -U ./linuxdevstackbox-*.pkg.tar.zst`                                                                                                  |
+| Debian .deb                    | DONE   | Depends on `apache2 mariadb-server php php-cgi libnss3-tools openssl policykit-1`; install with `sudo apt install ./linuxdevstackbox_*.deb`                                                                         |
+| Fedora .rpm                    | DONE   | Depends on `httpd mariadb-server php php-cgi openssl polkit`; install with `sudo dnf install ./linuxdevstackbox-*.rpm`                                                                                              |
 | GitHub Actions CI/CD           | DONE   | Builds on push to main                                                                                                                              |
 | App version constant           | DONE   | `src/lib/version.ts`                                                                                                                                |
 | Shared TypeScript types        | DONE   | `src/types/services.ts`                                                                                                                             |
 | TAURI_COMMANDS constants       | DONE   | `src/lib/commands.ts` grouped (system/services/php/config/tray/terminal/security/ssl); zero hardcoded command strings remain in frontend components |
-| Bundled stack (Apache+PHP+DB)  | DONE   | All core binaries ship in installer - no internet required                                                                                          |
+| Distro-provided stack          | DONE   | Apache, MariaDB/MySQL, PHP and php-cgi come from distribution packages. The app refuses to start a service whose binary is missing and prints the install command per family (Arch/Debian/Fedora)                   |
 | First-launch onboarding screen | DONE   | Welcome dialog with one-click "Start all services"; remembered in localStorage                                                                      |
 
 ---
@@ -86,19 +87,17 @@ Project details can read Apache and runtime-specific PHP errors. Configuration c
 | Feature                   | Status | Notes                                                                                                                                                    |
 | ------------------------- | ------ | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | MySQL start / stop        | DONE   | `start_mysql`, `stop_mysql` commands work                                                                                                                |
-| MySQL status check        | DONE   | Polls process list for `mysqld.exe`                                                                                                                      |
+| MySQL status check        | DONE   | Polls process list for `mysqld`                                                                                                                          |
 | MySQL version detect      | DONE   | Reads `mysqld --version`                                                                                                                                 |
 | MySQL data init           | DONE   | Auto-initializes if data dir missing                                                                                                                     |
 | MySQL config auto-create  | DONE   | Creates `config/my.cnf` if missing                                                                                                                       |
 | Apache start / stop       | DONE   | `start_apache`, `stop_apache` commands work                                                                                                              |
-| Apache status check       | DONE   | Polls process list for `httpd.exe`                                                                                                                       |
+| Apache status check       | DONE   | Polls process list for the Apache process (`httpd`/`apache2`)                                                                                            |
 | Apache config test        | DONE   | `test_apache_config` runs `httpd -t`                                                                                                                     |
-| Apache config auto-create | DONE   | Creates `config/httpd.conf` if missing                                                                                                                   |
-| Apache 32-bit detection   | DONE   | Warns user if 32-bit Apache on 64-bit build                                                                                                              |
-| PHP status check          | DONE   | Checks `php/current/php.exe` first (active junction), falls back to `php/8.3/php.exe`; runs `php --version` to surface the actual version string         |
+| Apache config auto-create | DONE   | Generates `httpd.conf` in the config directory if missing                                                                                                |
+| PHP status check          | DONE   | Runs `php --version` on the system PHP (minimum 8.2) to surface the actual version string; refuses to start when the binary is missing and prints the install command |
 | PHP as service start/stop | STUB   | `toggle_php` returns true immediately                                                                                                                    |
-| PHP CGI / FastCGI         | DONE   | `ScriptAlias /php/ php/current/` + `Action php-script` in httpd.conf; `php/current` junction auto-follows active version; phpMyAdmin reuses same handler |
-| PHP 8.4 CGI compatibility | DONE   | `patch_php_ini()` disables deprecated `session.sid_*` directives, forces `error_reporting = E_ALL & ~E_DEPRECATED & ~E_STRICT` and `html_errors = Off` to prevent CGI header corruption on PHP 8.4 |
+| PHP as CGI handler        | DONE   | PHP is served through the distribution `php-cgi` as a CGI handler in the generated `httpd.conf`; phpMyAdmin reuses the same handler                       |
 | Bulk start all services   | DONE   | `start_all_services` Tauri command + Dashboard Start All button                                                                                          |
 | Bulk stop all services    | DONE   | `stop_all_services` command + tray menu entry                                                                                                            |
 
@@ -158,15 +157,13 @@ Project details can read Apache and runtime-specific PHP errors. Configuration c
 
 ---
 
-## PHP Version Management
+## PHP Runtime and Extensions
 
 | Feature                       | Status | Notes                                                                                                                                                                                                                                                                |
 | ----------------------------- | ------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| List PHP versions (installed) | DONE   | `get_php_versions` scans `php/` dir                                                                                                                                                                                                                                  |
-| PHP version selector UI       | DONE   | `php-version-selector.tsx`                                                                                                                                                                                                                                           |
-| Switch PHP version            | DONE   | Creates `php/current` junction (Windows)                                                                                                                                                                                                                             |
-| Download PHP version          | DONE   | `download_php_version` streams the real zip from windows.php.net, extracts to `php/{branch}/`, writes a default `php.ini`, and emits `php-download-progress` events                                                                                                  |
-| PHP Extension management      | DONE   | `list_php_extensions` / `toggle_php_extension` Tauri commands rewrite `php.ini` (comment / uncomment / append `extension=NAME`); `PhpExtensionsDialog` opened from the PHP card overflow + context menu shows a searchable list of `ext/*.dll` with a Switch per row |
+| System PHP detection          | DONE   | Runs `php --version` against the distribution runtime; minimum supported version is 8.2. No bundled PHP, no version download, no version switching                                                                                                    |
+| Missing PHP guidance          | DONE   | Refuses to start a service when the binary is missing and prints the per-family install command (Arch/Debian/Fedora)                                                                                                                                                  |
+| PHP extension management      | DONE   | `list_php_extensions` / `toggle_php_extension` Tauri commands rewrite `~/.config/linuxdevstackbox/php.ini` (comment / uncomment / append `extension=NAME`); `PhpExtensionsDialog` opened from the PHP card overflow + context menu shows a searchable list of modules from the distro PHP extension dir with a Switch per row |
 
 ---
 
@@ -220,8 +217,8 @@ Project details can read Apache and runtime-specific PHP errors. Configuration c
 | ------------------------------- | ------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Tauri updater plugin configured | DONE    | `tauri-plugin-updater` in Cargo.toml                                                                                                                      |
 | Update check on startup         | DONE    | `auto-updater.tsx` checks on launch (2s delay) and every 6h; respects `autoCheckUpdates` pref; toast shown when up to date on manual check                |
-| Install update prompt           | DONE    | Dialog shows current vs new version, release notes, bytes-accurate progress bar, install-and-relaunch                                                     |
-| Update from GitHub Releases     | PARTIAL | Code + CI ready (`release.yml` uses `tauri-action` with signing). Needs `TAURI_PRIVATE_KEY` + `TAURI_KEY_PASSWORD` secrets added to GitHub repo settings  |
+| Update notification             | DONE    | When a newer release exists, the app shows the new version and instructs the user to upgrade the package with their package manager; there is no self-install on Linux |
+| Update from GitHub Releases     | DONE    | The app checks GitHub releases for a newer version and points the user at the upgrade command for their package family                                     |
 | Auto-check updates toggle       | DONE    | Settings page switch persisted to `localStorage.devstackbox.settings.autoCheckUpdates`; `auto-updater.tsx` honours it (poll on launch + every 6h when on) |
 
 ---
@@ -233,7 +230,7 @@ Project details can read Apache and runtime-specific PHP errors. Configuration c
 | Settings page                   | DONE   | `src/pages/settings/` nested routes provide General and Backup & Restore views                              |
 | Theme preference                | DONE   | Inline shadcn `Select` (light/dark/system) inside Settings (uses `useTheme`)                                 |
 | Language preference             | DONE   | Inline shadcn `Select` (English / Hindi) inside Settings (i18next.changeLanguage)                            |
-| Launch on Windows startup       | DONE   | `get_autostart` / `set_autostart` Tauri commands write `HKCU\...\Run\DevStackBox` via `reg.exe` (no admin)   |
+| Launch at login                 | DONE   | `get_autostart` / `set_autostart` Tauri commands manage an XDG autostart desktop entry in `~/.config/autostart` (no admin needed)   |
 | Auto-check updates (preference) | DONE   | See Auto-Update table                                                                                        |
 | Config shortcuts (Apache/MySQL) | DONE   | Config accessed via three-dots (MoreVertical) overflow menu on each service card; removed from Settings page |
 
@@ -245,7 +242,7 @@ Project details can read Apache and runtime-specific PHP errors. Configuration c
 | ------------------------ | ------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | About page (basic)       | DONE   | App version + author + GitHub/Docs/BugReport buttons                                                                                                                                        |
 | About page (extracted)   | DONE   | `src/pages/about.tsx` (AboutPage) is mounted through the router                                                                                                                             |
-| System Information block | DONE   | `get_system_info` Tauri command surfaces OS/arch, Windows version, app + Tauri version, Apache/MySQL/PHP versions; About page renders them in a definition list with Skeleton while loading |
+| System Information block | DONE   | `get_system_info` Tauri command surfaces OS/arch, distribution version, app + Tauri version, Apache/MySQL/PHP versions; About page renders them in a definition list with Skeleton while loading |
 
 ---
 
@@ -253,7 +250,7 @@ Project details can read Apache and runtime-specific PHP errors. Configuration c
 
 | Feature                         | Status  | Notes                                                                                                                                      |
 | ------------------------------- | ------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
-| Open PHP terminal (Windows cmd) | DONE    | `open_php_terminal` opens cmd.exe                                                                                                          |
+| Login shell terminal            | DONE    | `open_php_terminal` spawns the user's login shell in a PTY                                                                 |
 | Embedded xterm.js terminal      | DONE    | `@xterm/xterm` + `addon-fit` + `addon-web-links`; `terminal-panel.tsx` component; `pages/terminal.tsx` with tabbed sessions; sidebar entry |
 | MySQL CLI in terminal           | DONE    | "MySQL CLI" button spawns terminal tab with `mysql -u root` as initial command                                                             |
 | Composer CLI in terminal        | PLANNED | Composer binary not bundled yet                                                                                                            |
@@ -276,7 +273,7 @@ Project details can read Apache and runtime-specific PHP errors. Configuration c
 | ------------------------------- | ------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | Bug reporting via GitHub Issues | DONE   | `bug-report-dialog.tsx` opens a pre-filled GitHub issue with environment metadata                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
 | Security config analyzer        | DONE   | `security.tsx` page + `analyze_security` Rust command. Checks PHP ini, Apache conf, MySQL (anonymous users, remote root, empty root password, test DB). Findings grouped by severity (error/warning/info) with expandable details and recommendations.                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
-| HTTPS / SSL for local sites | DONE | v0.1.12: mkcert local CA, localhost and per-project certificates, repair and live trust checks. Windows trust approval required. |
+| HTTPS / SSL for local sites | DONE | v0.1.12: per-user local CA generated with the system openssl, localhost and per-project certificates with SANs, repair and live trust checks. CA trust is installed via a polkit (pkexec) prompt. |
 
 ---
 
@@ -285,9 +282,9 @@ Project details can read Apache and runtime-specific PHP errors. Configuration c
 | Feature                                    | Status  | Notes                                                                                                                                                                         |
 | ------------------------------------------ | ------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | List / add / remove vhosts via UI          | DONE    | `list_vhosts`, `add_vhost`, `remove_vhost`, `toggle_vhost` Tauri commands; `src/commands/vhosts.rs`                                                                           |
-| vhosts.json store + vhosts.conf generation | DONE    | Definitions persisted in `%LOCALAPPDATA%\DevStackBox\config\vhosts.json`; `vhosts.conf` auto-regenerated and included via `IncludeOptional` in `httpd.conf` (configVersion 9) |
+| vhosts.json store + vhosts.conf generation | DONE    | Definitions persisted in `~/.config/linuxdevstackbox/vhosts.json`; `vhosts.conf` auto-regenerated and included via `IncludeOptional` in `httpd.conf` (configVersion 9) |
 | Enable / disable per-vhost toggle          | DONE    | Toggled vhosts are removed from `vhosts.conf`; re-enabled ones are added back                                                                                                 |
-| Windows hosts file management              | DONE    | `get_hosts_entries` reads DevStackBox marker block; `update_hosts_entry` writes/removes `127.0.0.1 domain` via elevated PowerShell (UAC prompt)                               |
+| Hosts file management                     | DONE    | `get_hosts_entries` reads the LinuxDevStackBox marker block in `/etc/hosts`; `update_hosts_entry` writes/removes `127.0.0.1 domain` inside the managed block via a polkit (pkexec) prompt — the app itself never runs as root |
 | Show active vhosts on dashboard            | DONE    | Dashboard card lists all configured vhosts with enabled/disabled badge and a Manage link to the vhosts page                                                                   |
 | localhost always works with user vhosts    | DONE    | configVersion 9 template places localhost VirtualHost first with phpMyAdmin Alias inside, preventing name-based vhost mode from breaking `localhost/phpmyadmin`                |
 | HTTPS per virtual host | DONE | v0.1.12: certificates cover each enabled site and aliases. |
@@ -301,9 +298,9 @@ Project details can read Apache and runtime-specific PHP errors. Configuration c
 | ------- | ------ | ----- |
 | Create full backup zip | DONE | `create_full_backup` - zips config/, www/, mysql/all-databases.sql (mysqldump); returns `mysql_included` flag |
 | List saved backups | DONE | `list_full_backups` - scans backups/full/*.zip, returns filename/size/date |
-| Restore from backup | DONE | `restore_full_backup` - extracts config + www, pipes SQL to mysql.exe; path-traversal protected |
+| Restore from backup | DONE | `restore_full_backup` - extracts config + www, pipes SQL to the mysql client; path-traversal protected |
 | Delete backup | DONE | `delete_full_backup` - validated to backups/full/ only |
-| Open backups folder | DONE | `open_backups_folder` - opens Explorer at backups/full/ |
+| Open backups folder | DONE | `open_backups_folder` - opens the backups/full/ folder in the system file manager |
 | MySQL-skipped warning | DONE | Returns `mysql_included: false` when MySQL is not running; UI shows warning banner |
 
 ---
@@ -318,16 +315,18 @@ Project details can read Apache and runtime-specific PHP errors. Configuration c
 
 ## Version History Summary
 
+Versions before the Linux migration (v0.1.10 and earlier, and the bundling-related notes in later entries) describe the original Windows application and are kept for history.
+
 | Version         | Key Changes                                                                                                               |
 | --------------- | ------------------------------------------------------------------------------------------------------------------------- |
 | v0.1.17 | Ancestor .htaccess baseline, backed-up migration, log paths and document-root guidance |
 | v0.1.16 | Streamed SQL imports/backups and PHP/phpMyAdmin import limits |
 | v0.1.15 | Updater download progress and retry feedback |
-| v0.1.14 | Patched PHP runtimes and removal of PHP 8.1 |
+| v0.1.14 | Security patch batch for the PHP runtime |
 | v0.1.13         | Project Apache/PHP logs, configuration recovery copies, safer site changes and serialized configuration writes |
-| v0.1.12         | Project details, per-site PHP, trusted local HTTPS and safer manual upgrades |
+| v0.1.12         | Project details, trusted local HTTPS and safer manual upgrades |
 | v0.1.11         | MySQL 8.4 LTS + phpMyAdmin 5.2.2; Import from XAMPP; website XAMPP positioning; CI `check:ci`                           |
-| v0.1.10         | Stable release: MySQL/DB UX, service status, terminal ConPTY fixes; NSIS detail log; PHP 8.3 bundled, 8.1–8.5 on-demand   |
+| v0.1.10         | Stable Windows release: MySQL/DB UX, service status, terminal fixes; NSIS detail log; PHP 8.3 bundled, 8.1–8.5 on-demand   |
 | v0.1.9          | Audit remediation batch; installer detail log fix; diagnostics, projects MVP, channel-aware updater                         |
 | v0.1.8          | Branding and logo refresh; signed NSIS installer; in-place upgrade with `www` preservation; MDX docs site                 |
 | v0.1.7          | PHP 8.4 CGI compatibility (session.sid_*, error_reporting, html_errors); configVersion 9 vhost fix; NSIS-only releases   |
@@ -338,4 +337,4 @@ Project details can read Apache and runtime-specific PHP errors. Configuration c
 
 ## Release verification (v0.1.19)
 
-Ship with `npm run build:release` (runs `verify-release.mjs`, including MySQL **8.4.x** check). Installer uses Tauri minisign (not Windows Authenticode). Clean install checklist: `docs/getting-started/clean-install-checklist.md`.
+Release packages are built for each supported family: Arch (`.pkg.tar.zst`), Debian (`.deb`) and Fedora (`.rpm`). Clean install checklist: `docs/getting-started/clean-install-checklist.md`.

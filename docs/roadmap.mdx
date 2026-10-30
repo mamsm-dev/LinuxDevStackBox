@@ -1,60 +1,61 @@
 ---
 title: "Roadmap"
-description: "What DevStackBox is building and in what order."
+description: "What LinuxDevStackBox is building and in what order."
 icon: "Map"
 ---
-# DevStackBox - Official Roadmap
+# LinuxDevStackBox - Official Roadmap
 
 **The single source of truth for what we are building and in what order.**  
-Feature requests and discussions: [GitHub Discussions](https://github.com/DevStackBox/DevStackBox/discussions)
+Feature requests and discussions: [GitHub Discussions](https://github.com/mamsm-dev/LinuxDevStackBox/discussions)
 
 ---
 
 ## Product Vision
 
-DevStackBox will become the **best modern PHP local development stack for Windows**.
+LinuxDevStackBox will become the **best modern PHP local development stack for Linux**.
 
 It is NOT a universal developer infrastructure platform. Scope is intentionally limited.
 
-**Core Stack (always bundled in installer):**
+**Core Stack (from distribution packages, not bundled):**
 
 - Apache HTTP Server
-- PHP 8.3 (one version bundled today; additional versions are downloadable later)
-- MySQL (bundled portable distribution)
-- phpMyAdmin
+- PHP (the single system runtime, minimum 8.2)
+- MySQL/MariaDB (distribution server, run from the user's data dir)
+- phpMyAdmin (bundled with the app)
 
 No Docker, no Redis, no PostgreSQL, no Node runtime manager - not in v1.
 
-**Installer Philosophy:**
+**Packaging Philosophy:**
 
-> Install → Start → Works immediately.
+> Install the package + the distribution stack → Start → Works.
 
-The installer must produce a fully functional PHP development environment without any post-install downloads. A user in India on a slow connection must be able to install once, unplug from the internet, and have a working `localhost` stack.
+The app package is small because Apache, MariaDB/MySQL and PHP come from your distribution. If a required binary is missing, the app refuses to start the service and prints the exact install command for your package family:
 
-Do NOT require users to download core components on first launch. Bad first-launch experiences drive users away permanently.
+- Arch: `sudo pacman -S apache mariadb php php-cgi`
+- Debian/Ubuntu: `sudo apt install apache2 mariadb-server php php-cgi`
+- Fedora: `sudo dnf install httpd mariadb-server php php-cgi`
 
-**What is bundled vs downloadable:**
+**What is packaged vs provided by the distribution:**
 
 | Component           | Strategy      | Notes                                                  |
 | ------------------- | ------------- | ------------------------------------------------------ |
-| Apache              | Bundled       | Core requirement, no internet needed                   |
-| PHP 8.3             | Bundled       | Current default version, works immediately             |
-| MySQL               | Bundled       | Database server                                        |
-| phpMyAdmin          | Bundled       | Developers expect it, keep it bundled                  |
-| Default configs     | Bundled       | Required for first launch                              |
-| Sample `www/` page  | Bundled       | Confirms stack works immediately                       |
-| PHP 8.2, 8.4, 8.5 | Downloadable  | On demand via PHP Versions UI (8.3 stays bundled) |
+| Apache              | Distro package | `apache` (Arch), `apache2` (Debian), `httpd` (Fedora)  |
+| PHP + php-cgi       | Distro package | Single system runtime, minimum 8.2; no version switching |
+| MySQL/MariaDB       | Distro package | Data lives in the user's data dir, so updates never touch databases |
+| phpMyAdmin          | Packaged      | Writable copy in the app's data dir, served at `/phpmyadmin` |
+| Default configs     | Generated     | Required for first launch                              |
+| Sample `www/` page  | Packaged      | Confirms stack works immediately                       |
 | Node.js support     | Future module | Not in v1                                              |
 | Redis               | Future module | Not in v1                                              |
 | PostgreSQL          | Future module | Not in v1                                              |
 
-**Target installer size:** 250–500 MB is acceptable. Do not sacrifice reliability or UX to reduce installer size.
+Because the stack comes from the distribution, the app package stays small. Do not sacrifice reliability or UX to reduce package size.
 
 ---
 
 ## Current documentation baseline: v0.1.22
 
-**v0.1.22** bundles **PHP 8.3.36-1** with a verified package receipt, improves **UI contrast**, and adds a **stable-read command cache** for PHP and configuration tabs. **v0.1.21** restores **on-demand PHP downloads** when windows.php.net lists package revisions such as `8.4.27-1`, improves **MySQL import diagnostics**, and fixes the About **Update Available** button label. **v0.1.20** improves **log UX**, **virtual-host error handling**, **bulk service controls**, and **plain ZIP SQL import** in the database workspace. **v0.1.19** adds **log management** (clear view, archives, safe delete, rotation settings), a **workspace cache** for faster navigation, and a slimmer **phpMyAdmin** installer payload (pmahomme only). **v0.1.18** adds the **database workspace** (Databases, Users, Import & Export) with details, SQL/GZIP/ZIP transfer, saved backups, activity history, and database-level permissions. **v0.1.17** adds the Apache ancestor `.htaccess` baseline with an additive migration, log paths and document-root diagnostics. Published on 23 October 2026; see the release validation report for installed-site test coverage. **v0.1.16** streams large `.sql` restores from disk, migrates PHP/phpMyAdmin import limits safely, and streams mysqldump backups without loading dumps into RAM. **v0.1.15** fixes in-app updater download progress. **v0.1.14** bundles patched PHP 8.3.36, adds PHP patch upgrades and full-version labels, and removes end-of-life PHP 8.1 from supported choices. **v0.1.13** adds project error-log access and safeguards for configuration updates. **v0.1.12** introduced **project workspaces** (connect folders outside `www`), **per-project website PHP** (installed runtimes only), and **trusted local HTTPS** with bundled mkcert. The stack still ships **MySQL 8.4 LTS**, **phpMyAdmin 5.2.2**, and **PHP 8.3** in the installer, with **8.2**, **8.4**, and **8.5** on demand. **Settings → Import from XAMPP** copies `htdocs` into `www`.
+**v0.1.22** improves **UI contrast** and adds a **stable-read command cache** for PHP and configuration tabs. **v0.1.21** improves **MySQL import diagnostics** and fixes the About **Update Available** button label. **v0.1.20** improves **log UX**, **virtual-host error handling**, **bulk service controls**, and **plain ZIP SQL import** in the database workspace. **v0.1.19** adds **log management** (clear view, archives, safe delete, rotation settings) and a **workspace cache** for faster navigation. **v0.1.18** adds the **database workspace** (Databases, Users, Import & Export) with details, SQL/GZIP/ZIP transfer, saved backups, activity history, and database-level permissions. **v0.1.17** adds the Apache ancestor `.htaccess` baseline with an additive migration, log paths and document-root diagnostics. Published on 23 October 2026; see the release validation report for installed-site test coverage. **v0.1.16** streams large `.sql` restores from disk, migrates PHP/phpMyAdmin import limits safely, and streams mysqldump backups without loading dumps into RAM. **v0.1.15** fixes update-check download progress. **v0.1.13** adds project error-log access and safeguards for configuration updates. **v0.1.12** introduced **project workspaces** (connect folders outside `www`) and **trusted local HTTPS** with a per-user certificate authority. The bundled **phpMyAdmin** copy and generated **www** page ship with the app; Apache, MariaDB/MySQL and PHP come from your distribution. **Settings → Import from XAMPP** copies `htdocs` from `/opt/lampp` into `www`.
 
 ---
 
@@ -72,7 +73,7 @@ Planned in this order for upcoming releases:
 
 **Goal:** Make what exists actually work reliably.
 
-All Phase 1 items are complete. See feature-status and advanced/troubleshooting for details.
+All Phase 1 items are complete. This phase and Phase 2 were completed on the original Windows codebase before the Linux migration and are kept for history. See feature-status and advanced/troubleshooting for details.
 
 ### 1.1 Remove Dead Code
 
@@ -93,8 +94,8 @@ All Phase 1 items are complete. See feature-status and advanced/troubleshooting 
 
 ### 1.4 Fix Path Resolution
 
-- [x] Remove `C:\xampp\htdocs\DevStackBox` from production fallback paths
-- [x] Production fallbacks: `C:\dsb`, `C:\Program Files\DevStackBox`, `C:\DevStackBox`
+- [x] Remove `C:\xampp\htdocs\LinuxDevStackBox` from production fallback paths
+- [x] Production fallbacks: `C:\dsb`, `C:\Program Files\LinuxDevStackBox`, `C:\LinuxDevStackBox`
 - [ ] Add path resolution test via `debug_installation` command
 
 ### 1.5 Fix `switch_php_version`
@@ -118,28 +119,29 @@ All Phase 1 items are complete. See feature-status and advanced/troubleshooting 
 
 This is a prerequisite for enabling auto-updates. Without it, updates will destroy user data.
 
-- [x] Define User Data Root path: `%LOCALAPPDATA%\DevStackBox\` (override via `DEVSTACKBOX_DATA_DIR` env var)
-- [x] Move MySQL `data/` directory out of `mysql/` and into User Data Root (`<root>/mysql-data/`)
-- [x] Preserve the install-directory `www/` project folder during upgrades; configs, logs, and databases use the User Data Root
-- [x] Move `logs/` to User Data Root
-- [x] Move runtime `config/` to User Data Root (default configs are now generated into `<root>/config/` on first run; source `config/` in repo is dev-only)
+- [x] Define user data paths per the XDG Base Directory Specification (override via `LINUXDEVSTACKBOX_DATA_DIR` env var)
+- [x] Move MySQL data out of the application area into the data root (`~/.local/share/linuxdevstackbox/mysql-data/`)
+- [x] Preserve the `www/` project folder during upgrades; configs, logs, and databases use the config/data roots
+- [x] Move `logs/` to the data root (`~/.local/share/linuxdevstackbox/logs/`)
+- [x] Move runtime config to the config root (generated on first run into `~/.config/linuxdevstackbox/`)
 - [x] Update `get_installation_path()` and add `get_user_data_root()` to `lib.rs`
 - [x] Add `configVersion: 1` to all config files written by the app (added to generated `php.ini`, `my.cnf`, and `httpd.conf`; migration tooling still TBD)
 - [x] Update all hardcoded path assumptions in `lib.rs`
-- [ ] Test: app works correctly after separation on a clean Windows install (manual QA)
+- [ ] Test: app works correctly after separation on a clean install (manual QA)
 
 **Implemented layout (Phase 1.8):**
 
 ```
-%LOCALAPPDATA%\DevStackBox\
-  config\           my.cnf, httpd.conf, phpmyadmin.conf
-  config-backups\   timestamped .bak files
-  logs\             error.log, access.log, mysql.log, php_error.log, httpd.pid
-  mysql-data\       MySQL data directory (initialized on first start)
-  backups\          mysql dumps and other app backups
+~/.config/linuxdevstackbox/       httpd.conf, my.cnf, php.ini, vhosts.json, HTTPS certificates
+~/.local/share/linuxdevstackbox/
+  logs/             service logs
+  mysql-data/       MySQL/MariaDB data directory (initialized on first start)
+  www/              web root holding projects (preserved during upgrades)
+  backups/          mysql dumps and other app backups
+  phpmyadmin/       writable copy of the bundled phpMyAdmin
 ```
 
-Binaries remain in the install directory alongside `www`, which holds projects and must be preserved. Back up projects and export databases before updating.
+Back up projects and export databases before updating.
 
 See `reference/installer` for the full architecture.
 
@@ -175,18 +177,9 @@ src-tauri/src/
 
 **Goal:** Core features work end-to-end without workarounds.
 
-### 3.1 Additional PHP Version Downloader [DONE]
+### 3.1 Additional PHP Version Downloader [SUPERSEDED]
 
-**Note:** Base PHP 8.3 is bundled today. This feature adds support for downloading additional PHP versions (8.2, 8.4, etc.) on demand. It does not replace the bundled PHP unless the product decision changes later.
-
-- [x] Download PHP zip from `windows.php.net` using `reqwest` (rustls, streaming) in the Rust backend
-- [x] Resolve version-to-zip via `https://windows.php.net/downloads/releases/releases.json` and pick the latest `ts.zip` for the requested branch
-- [x] Extract to `<install>/php/{branch}/` using the `zip` crate with `enclosed_name()` traversal guard
-- [x] Generate `php.ini` with sensible defaults (copy `php.ini-production` when present, else write a minimal config with `# configVersion: 1` header)
-- [x] Verify `php.exe` exists after extraction (`php_branch_exe(branch).exists()` drives `installed` in `get_php_versions`)
-- [x] Emit progress events to frontend via `app.emit("php-download-progress", PhpDownloadProgress { version, stage, percent, downloaded, total, message })`
-- [x] Show real progress bar in `PHPVersionSelector` (shadcn `Progress`, stage label, error display)
-- [x] Graceful error handling: errors emit `stage = "error"` with message; UI surfaces a destructive toast
+**Note:** This feature was completed on the Windows codebase, which downloaded extra PHP versions from windows.php.net. It is **not applicable on Linux**: PHP is the single system runtime from your distribution (minimum 8.2), and upgrading PHP means upgrading the distribution `php` package. There is no bundled PHP, no version download and no version switching.
 
 ### 3.2 Real-Time Log Streaming [DONE]
 
@@ -197,9 +190,9 @@ src-tauri/src/
 
 ### 3.3 Virtual Hosts (Local Domains)
 
-- [x] Add/remove vhosts via UI (`myapp.local`, `shop.local`)
-- [x] Auto-edit `apache/conf/extra/httpd-vhosts.conf`
-- [x] Edit Windows `hosts` file (requires elevation prompt)
+- [x] Add/remove vhosts via UI (`myapp.test`, `shop.test`)
+- [x] Auto-generate Apache virtual-host configuration
+- [x] Edit the system hosts file via a polkit (pkexec) prompt
 - [x] Show all active virtual hosts on dashboard
 
 ### 3.4 Process Supervision (Crash Recovery) [PARTIAL]
@@ -215,76 +208,53 @@ src-tauri/src/
 - [x] List saved backups (`list_full_backups`) - sorted newest first with filename, size, and date
 - [x] Restore from backup (`restore_full_backup`) - extracts config + www, re-imports MySQL SQL; path-traversal protected
 - [x] Delete backup (`delete_full_backup`) - validates path is inside backups/full/ before deleting
-- [x] Open backups folder in Explorer (`open_backups_folder`)
+- [x] Open backups folder in the system file manager (`open_backups_folder`)
 - [x] Frontend warning when MySQL was not running during backup (`mysql_included: false`)
 - [x] Restore confirmation dialog warns user to back up current state first
 
 ---
 
-## Phase 4 - Installer & Distribution
+## Phase 4 - Packaging & Distribution
 
 **Goal:** Reliable installation on real user machines.
 
-### 4.1 MSI Reliability and Bundled Stack Verification
+### 4.1 Package Reliability and Distro Stack Verification
 
-- [ ] Verify MySQL binaries are in place and correctly configured in installer bundle
-- [ ] Verify bundled stack installs and starts correctly: Apache + PHP 8.3 + MySQL + phpMyAdmin
-- [ ] Test installation path options (`C:\dsb`, `C:\Program Files\DevStackBox`)
-- [ ] Verify all binaries are in expected paths after MSI install
-- [ ] Test clean install and upgrade install
-- [ ] Test first-launch experience: shows all services ready, no internet required
-- [ ] Document known conflicts (IIS, other XAMPP installs)
+- [ ] Verify the app package installs cleanly on Arch, Debian and Fedora derivatives
+- [ ] Verify the distro-provided stack (Apache + PHP + MariaDB/MySQL + phpMyAdmin) starts and serves correctly after install
+- [ ] Test upgrade installs (reinstall the newer package over the old one) and uninstall, confirming user data is preserved
+- [ ] Test first-launch experience when the distribution packages are already installed and when they are missing (install command shown)
+- [ ] Document known conflicts (existing Apache/MariaDB instances, other local stacks, port conflicts)
 
-### 4.2 64-bit Apache Bundle
+### 4.2 Update Checks
 
-- [ ] Replace any 32-bit Apache binaries with ApacheLounge 64-bit (VC17)
-- [ ] Document the Apache source and build in `advanced/troubleshooting`
-- [ ] Test DLL dependencies on clean Windows 11
+**Update checks** are shipped: the app checks GitHub releases on launch and periodically, and when an update exists it tells the user to upgrade the package with their package manager. There is no self-install on Linux.
 
-### 4.3 Auto-Updater
-
-**Prerequisites - do not start this until ALL are complete:**
-
-- Phase 1.8 (App/Data directory separation) is done
-- `get_installation_path()` returns deterministic, stable paths
-- MySQL `data/` is in User Data Root, not App Root
-- Config versioning (`configVersion` field) is in place
-
-**Implementation tasks:**
-
-- [x] Configure updater endpoint in `tauri.conf.json` (GitHub Releases JSON URL)
-- [ ] Generate signing key pair and store private key in GitHub Secrets
-- [ ] Implement pre-update service shutdown (stop Apache + MySQL cleanly before update)
-- [ ] Implement backup-before-update (copy current configs to config-backups/)
-- [ ] Implement config migration runner (reads configVersion, applies migrations)
-- [ ] Test update flow: install v0.X.Y, update to v0.X.Y+1, verify user data intact
-- [ ] Document full release + signing flow in `development/release-process`
+- [x] Configure update-check endpoint in `tauri.conf.json` (GitHub Releases JSON URL)
+- [x] Show the available version and upgrade instructions when a newer release exists
+- [ ] Implement pre-update service shutdown guidance (stop Apache + MySQL cleanly before upgrading the package)
+- [ ] Test update flow: install v0.X.Y, upgrade to v0.X.Y+1 via the package manager, verify user data intact
+- [ ] Document the full release flow in `development/release-process`
 
 See `reference/installer` for the full architecture and checklist.
-
-### 4.4 Code Signing
-
-- [ ] Research signing options (Azure Code Signing, EV cert, self-signed)
-- [ ] Document the decision in `docs/development/adr/006-code-signing`
-- [ ] Implement if Windows Defender SmartScreen is blocking the installer
 
 ---
 
 ## Phase 5 - Developer Experience Polish [PARTIAL]
 
-**Goal:** Make DevStackBox noticeably better than XAMPP/WAMP for daily use.
+**Goal:** Make LinuxDevStackBox noticeably better than XAMPP/WAMP for daily use.
 
 ### 5.1 HTTPS Localhost
 
 - [x] Auto-generate local CA and local certificate for `localhost`
-- [ ] Automate trust/install flow for the local CA in Windows certificate store (requires elevation)
+- [x] Trust the per-user CA in the system trust store via a polkit (pkexec) prompt (`update-ca-trust` on Arch/Fedora, `update-ca-certificates` on Debian)
 - [x] Extend certificate generation to virtual host domains (v0.1.12)
 
 ### 5.2 PHP Error Visibility
 
 - [x] Surface recent Apache/MySQL/PHP log entries in the main UI
 - [ ] Show PHP fatal errors with file/line
-- [x] Port conflict detection before Apache/MySQL starts (`ensure_port_available` blocks startup with a clear message when port 80, 443, or 3306 is taken)
+- [x] Port conflict detection before Apache/MySQL starts (`ensure_port_available` blocks startup with a clear message when port 8080, 443, or 3306 is taken)
 
 ### 5.3 Tray Polish
 
@@ -294,7 +264,7 @@ See `reference/installer` for the full architecture and checklist.
 
 ### 5.4 System Tray & Startup
 
-- [x] Option to launch on Windows startup
+- [x] Option to launch at login (XDG autostart, no admin needed)
 - [x] Option to minimize to tray on window close
 
 ---
@@ -336,14 +306,14 @@ contextual sub-panels, real preferences in Settings, useful About page.
 ### 6.5 Real Settings Page
 
 - [x] Settings routes include Appearance, Language, Startup, Updates, and Backup & Restore
-- [x] `set_autostart` / `get_autostart` Tauri commands manage Windows startup via `reg.exe`
+- [x] `set_autostart` / `get_autostart` Tauri commands manage login autostart via an XDG autostart desktop entry in `~/.config/autostart`
 - [x] "Auto-check updates" is stored in `localStorage` key `devstackbox.settings.autoCheckUpdates`; `auto-updater.tsx` honours it
 - [x] Inline settings JSX moved out of `App.tsx`
 
 ### 6.6 About Page System Info
 
 - [x] Extract About page into `src/pages/about.tsx`
-- [x] New `get_system_info` Tauri command surfaces OS, arch, Windows version, app version, Tauri version, Apache version, MySQL version, and installed PHP versions
+- [x] New `get_system_info` Tauri command surfaces OS, arch, distribution version, app version, Tauri version, Apache version, MySQL version, and the system PHP version
 - [x] System Information card on About renders the result as a definition list with a loading skeleton
 
 ---
@@ -356,7 +326,7 @@ These are explicitly out of scope for the current product:
 - Plugin marketplace
 - Cloud sync
 - Mobile development tools
-**The following are deferred to future optional modules (not in v1 core installer, but planned or possible later):**
+**The following are deferred to future optional modules (not in the v1 core package, but planned or possible later):**
 
 - **Nginx** - see **Next after v0.1.22**; Apache remains the bundled default
 - Redis (future optional module)
@@ -368,12 +338,13 @@ These are explicitly out of scope for the current product:
 
 ---
 
-## MySQL (Decided)
+## MySQL / MariaDB (Decided)
 
-DevStackBox uses **MySQL** as its bundled database server.
+LinuxDevStackBox uses the **MySQL-compatible server from your distribution** (MariaDB or MySQL).
 
-- Bundled as a portable Windows distribution under `mysql/`
-- Data lives outside the app folder (under the user data dir) so updates never touch databases
+- Runs from the user's data dir with a generated `my.cnf`; data lives in `~/.local/share/linuxdevstackbox/mysql-data`, so package updates never touch databases
+- Works with both MariaDB (initialized with `mariadb-install-db`) and MySQL (initialized with `mysqld --initialize-insecure`)
+- Binds `127.0.0.1` on port 3306 with its socket inside the data dir
 - Tauri command names: `start_mysql`, `stop_mysql`, `mysql_status`, `mysql_version`, etc.
 - Works out of the box with phpMyAdmin, Laravel, WordPress, and other standard PHP tooling
 

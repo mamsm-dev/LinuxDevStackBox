@@ -10,20 +10,20 @@ Record the exact action, error and time before changing configuration. The app's
 
 ## Apache rejects a parent .htaccess
 
-An error such as `project/.htaccess: <IfModule not allowed here` occurs before Laravel runs. The failing file may be above the selected public document root. v0.1.17 adds an explicit ancestor-directory baseline; restart Apache after upgrading and compare the path in a new log entry. Explicit custom directory policies can still affect that baseline. Do not add a broad rule for an entire drive or hardcode an XAMPP folder. See [Projects](../getting-started/projects).
+An error such as `project/.htaccess: <IfModule not allowed here` occurs before Laravel runs. The failing file may be above the selected public document root. v0.1.17 adds an explicit ancestor-directory baseline; restart Apache after upgrading and compare the path in a new log entry. Explicit custom directory policies can still affect that baseline. Do not add a broad rule for an entire filesystem tree or hardcode an XAMPP folder. See [Projects](../getting-started/projects).
 
 ## A service does not start
 
 1. Open the service's Logs tab or the [Logs workspace](../user-guide/logs).
 2. Check the configured port and identify any conflicting process using [Networking](environment). Stop only the service you intend to stop, or choose a different port and update its clients.
 3. If the error names configuration, use the [editor and saved history](../user-guide/configuration-editor). Restart after a successful save.
-4. For a missing executable or DLL, confirm the installed runtime files and the release's prerequisites. Preserve user data before repairing from an official installer.
+4. If the error says the binary is missing, install the distribution packages - the app prints the install command for your family (Arch: `sudo pacman -S apache mariadb php php-cgi`; Debian/Ubuntu: `sudo apt install apache2 mariadb-server php php-cgi`; Fedora: `sudo dnf install httpd mariadb-server php php-cgi`). Preserve user data before repairing an app package from an official release.
 
-Installed configurations and data normally live under `%LOCALAPPDATA%\devstackbox`; they are not necessarily in the install folder. Use the log path reported by the app and check custom destinations. A manually run Apache syntax check must use the same configuration file as the managed instance.
+Installed configurations normally live in `~/.config/linuxdevstackbox` and data in `~/.local/share/linuxdevstackbox`; they are not inside the app package. Use the log path reported by the app and check custom destinations. A manually run Apache syntax check must use the same configuration file as the managed instance.
 
 ## MySQL stops or cannot read its data
 
-Keep the error log and data directory. Check the actual configuration, port, permissions, disk space and any server-version change. Configuration backups are not database backups. Do not delete data or lock files merely because an old guide suggests it, and do not point MySQL 8.4 at another product's data directory.
+Keep the error log and data directory. Check the actual configuration, port, permissions, disk space and any server-version change. Configuration backups are not database backups. Do not delete data or lock files merely because an old guide suggests it, and do not point the server at another product's data directory.
 
 For MySQL version migration, obtain a compatible SQL export from a working source/backup and test restoration separately. See [Upgrading](../getting-started/upgrading) and [SQL backups](../user-guide/database-backups).
 
@@ -33,11 +33,9 @@ The editor offers Reload, Revert, Save and **Restore a saved backup**. There is 
 
 If a file is missing, retain any recovery copies and use the normal service preparation or a known-working backup. Do not copy another machine's absolute paths blindly. The [configuration guide](../user-guide/configuration-editor) explains drafts, history and restarts.
 
-## PHP download, activation or extensions fail
+## PHP activation or extensions fail
 
-PHP downloading is implemented. Open **Services → PHP → Versions** and inspect the installed/available patch and operation error. A network failure, failed verification, incomplete extraction and locked runtime require different remedies. Do not bypass integrity checks. Stop Apache and close PHP terminals before updating runtime files.
-
-Confirm the branch is installed and supported before activation. For missing modules, check the runtime and ini actually used by the website, especially for pinned projects. Restart Apache after an extension change. See [PHP](../user-guide/php).
+PHP is the single system runtime from your distribution (minimum 8.2); there is nothing to download or activate inside the app. If the app reports PHP as missing, install the distribution packages using the printed install command. If a website reports a missing module, install the matching distro extension package, enable it for the runtime and ini actually used by the website, and restart Apache. See [PHP](../user-guide/php).
 
 ## phpMyAdmin says no data was received
 
@@ -59,11 +57,11 @@ SQL import errors can leave partial changes. Preserve the source and error befor
 
 Check free space, file permissions and whether the archive included MySQL. Preserve the archive and the error. Full backups exclude logs, external project files and HTTPS private material. Restoration can be partial; repeatedly restoring is not a safe rollback strategy. Use [Full backup and restore](../user-guide/full-backup) for scope and recovery.
 
-## Installer or updater fails
+## Package install or update check fails
 
-Current public Windows installers use NSIS `.exe` packages. Record the installer log/error, install location and any named locked file. Close the application/process holding that file before retrying. Do not disable antivirus broadly or uninstall first as a generic workaround; examine the actual security or file-access report and verify the official package.
+Current Linux packages are `linuxdevstackbox-*.pkg.tar.zst` (Arch), `linuxdevstackbox_*.deb` (Debian) and `linuxdevstackbox-*.rpm` (Fedora). Record the package manager error output and the package file you used. Verify the package came from an [official release](https://github.com/mamsm-dev/LinuxDevStackBox/releases/latest) and check that the distribution stack packages (apache, mariadb-server, php, php-cgi and their family equivalents) are installed; the .deb and .rpm declare them as dependencies, while on Arch they may need installing separately.
 
-Update signatures and Windows publisher trust are different checks. Do not bypass failed updater verification. Preserve projects and data, then follow [Installation](../getting-started/installation) and [Upgrading](../getting-started/upgrading). Historical MSI notes are for older builds, not the current install flow.
+Update checks and package trust are different things. If an update check fails, verify connectivity; if a package install fails, read the package manager error rather than bypassing it. Preserve projects and data, then follow [Installation](../getting-started/installation) and [Upgrading](../getting-started/upgrading).
 
 ## Blank screen or unexpected UI text
 
@@ -73,6 +71,6 @@ A raw translation key is a UI defect. Report the screen and selected language. A
 
 ## Report a problem
 
-Include app version, Windows version, steps, expected/actual result and relevant sanitized log lines. Do not publish passwords, full environment dumps or local CA private keys. Use the [issue tracker](https://github.com/DevStackBox/DevStackBox/issues) for ordinary defects and the [security policy](https://www.devstackbox.com/security) for vulnerabilities.
+Include app version, distribution version, steps, expected/actual result and relevant sanitized log lines. Do not publish passwords, full environment dumps or local CA private keys. Use the [issue tracker](https://github.com/mamsm-dev/LinuxDevStackBox/issues) for ordinary defects and the [security policy](https://www.devstackbox.com/security) for vulnerabilities.
 
-Legacy troubleshooting and technical-debt text is preserved as a [historical snapshot](https://github.com/DevStackBox/DevStackBox/blob/main/docs/archive/troubleshooting-before-user-guides-2026-10-23.md), not current operating instructions.
+Legacy troubleshooting and technical-debt text is preserved as a [historical snapshot](https://github.com/mamsm-dev/LinuxDevStackBox/blob/main/docs/archive/troubleshooting-before-user-guides-2026-10-23.md), not current operating instructions.

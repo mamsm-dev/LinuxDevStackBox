@@ -1,6 +1,6 @@
 ---
 title: "Tauri Commands"
-description: "Backend command reference for DevStackBox."
+description: "Backend command reference for LinuxDevStackBox."
 icon: "Terminal"
 ---
 **Single source of truth for all backend IPC commands.**
@@ -88,8 +88,8 @@ const result = await safeInvoke<ReturnType>(
 
 | Command Name                 | Source File              | Parameters                                      | Returns              | Notes                          |
 | ---------------------------- | ------------------------ | ----------------------------------------------- | -------------------- | ------------------------------ |
-| `detect_xampp_installations` | `commands/migration.rs`  | none                                            | `XamppDetection[]`   | Scans default XAMPP paths      |
-| `import_from_xampp`          | `commands/migration.rs`  | `xampp_root: String`, `copy_htdocs: bool`       | `XamppImportResult`  | Copies htdocs into `www`       |
+| `detect_xampp_installations` | `commands/migration.rs`  | none                                            | `XamppDetection[]`   | Scans `/opt/lampp`          |
+| `import_from_xampp`          | `commands/migration.rs`  | `xampp_root: String`, `copy_htdocs: bool`       | `XamppImportResult`  | Copies htdocs into the data root's `www` |
 
 ### Apache Commands
 
@@ -107,12 +107,12 @@ const result = await safeInvoke<ReturnType>(
 | ---------------------- | ----------------- | ------------------------------------------------------- | ------------------ | --------------------------------------- |
 | `get_php_status`       | `commands/php.rs` | none                                                    | `ServiceInfo`      |                                         |
 | `toggle_php`           | `commands/php.rs` | none                                                    | `bool`             | Currently a stub                        |
-| `get_php_versions`     | `commands/php.rs` | none                                                    | `PHPVersionInfo[]` |                                         |
-| `switch_php_version`   | `commands/php.rs` | `version: String`                                       | `bool`             | Creates `php/current` junction via cmd  |
-| `download_php_version` | `commands/php.rs` | `version: String`                                       | `bool`             | Streams from windows.php.net; emits `php-download-progress` events |
+| `get_php_versions`     | `commands/php.rs` | none                                                    | `PHPVersionInfo[]` | Reports the distro PHP runtime; minimum 8.2 enforced |
 | `list_php_extensions`  | `commands/php.rs` | `version: String`                                       | `PHPExtension[]`   |                                         |
 | `toggle_php_extension` | `commands/php.rs` | `version: String`, `extension: String`, `enabled: bool` | `String`           |                                         |
-| `open_php_terminal`    | `commands/php.rs` | `version: String`                                       | `String`           | Opens Windows Terminal with PHP in PATH |
+| `open_php_terminal`    | `commands/php.rs` | `version: String`                                       | `String`           | Opens a terminal session with the generated php.ini active |
+
+PHP comes from the distribution packages (`php` + `php-cgi`); version upgrades happen through the package manager, so the original app's PHP download feed and version-switching commands have no Linux equivalent and are not registered.
 
 ### Log Commands
 
@@ -150,9 +150,9 @@ const result = await safeInvoke<ReturnType>(
 | Command | Source | Parameters | Result | Notes |
 | --- | --- | --- | --- | --- |
 | `get_ssl_status` | `commands/ssl.rs` | none | `SslStatus` | Local trust and HTTPS status |
-| `generate_ssl_cert` | `commands/ssl.rs` | none | `String` | Provision with mkcert |
+| `generate_ssl_cert` | `commands/ssl.rs` | none | `String` | Provisions the local CA and leaf certificate with system `openssl` |
 | `enable_ssl` | `commands/ssl.rs` | `port: Option<u16>` | `String` | Provision and enable local HTTPS |
-| `trust_ssl_ca` | `commands/ssl.rs` | none | `String` | Request local CA trust; Windows approval may be needed |
+| `trust_ssl_ca` | `commands/ssl.rs` | none | `String` | Installs the CA anchor via a single `pkexec` invocation (`--ca-trust-operation`); a Polkit prompt appears |
 | `disable_ssl` | `commands/ssl.rs` | none | `String` | Disable HTTPS |
 
 ### Virtual Host and Project Commands
@@ -167,7 +167,7 @@ Parameters below use Rust names; Tauri callers use camelCase. Failed commands re
 | `remove_vhost` | `commands/vhosts.rs` | `domain` | unit; keeps website files |
 | `toggle_vhost` | `commands/vhosts.rs` | `domain`, `enabled` | unit |
 | `get_hosts_entries` | `commands/vhosts.rs` | none | `String[]` |
-| `update_hosts_entry` | `commands/vhosts.rs` | `domain`, `action` | `String`; may require elevation |
+| `update_hosts_entry` | `commands/vhosts.rs` | `domain`, `action` | `String`; edits `/etc/hosts` via a single fixed-argument `pkexec` invocation (`--hosts-operation`), so a Polkit prompt appears |
 | `get_project_diagnostics` | `commands/projects.rs` | `project_id` | `ProjectDiagnostics` |
 | `get_site_configuration_warnings` | `commands/projects.rs` | none | `String[]` |
 | `suggest_document_root` | `commands/projects.rs` | `path` | `String` |
@@ -184,7 +184,7 @@ See [Projects, PHP & HTTPS](../getting-started/projects) for the user workflow a
 | `list_full_backups`   | `commands/fullbackup.rs`   | none                  | `BackupEntry[]` | Sorted newest-first                    |
 | `restore_full_backup` | `commands/fullbackup.rs`   | `backup_name: String` | `String`        | Path-traversal protected               |
 | `delete_full_backup`  | `commands/fullbackup.rs`   | `backup_name: String` | `String`        | Validates path is inside backups/full/ |
-| `open_backups_folder` | `commands/fullbackup.rs`   | none                  | `String`        | Opens Explorer at backups dir          |
+| `open_backups_folder` | `commands/fullbackup.rs`   | none                  | `String`        | Opens the backups directory in the system file manager |
 
 ---
 
@@ -226,10 +226,10 @@ Many commands accept a `service: String` parameter. Valid values:
 
 | Value                   | Maps to Config File                                    | Notes          |
 | ----------------------- | ------------------------------------------------------ | -------------- |
-| `"mysql"`               | `%LOCALAPPDATA%\DevStackBox\config\my.cnf`             |                |
-| `"apache"` or `"httpd"` | `%LOCALAPPDATA%\DevStackBox\config\httpd.conf`         | Both accepted  |
-| `"php"`                 | `%LOCALAPPDATA%\DevStackBox\config\php.ini`            |                |
-| `"phpmyadmin"`          | `%LOCALAPPDATA%\DevStackBox\config\phpmyadmin.conf`    |                |
+| `"mysql"`               | `$XDG_CONFIG_HOME/linuxdevstackbox/my.cnf`                  |                |
+| `"apache"` or `"httpd"` | `$XDG_CONFIG_HOME/linuxdevstackbox/httpd.conf`              | Both accepted  |
+| `"php"`                 | `$XDG_CONFIG_HOME/linuxdevstackbox/php.ini`                 |                |
+| `"phpmyadmin"`          | `$XDG_CONFIG_HOME/linuxdevstackbox/phpmyadmin.conf`         |                |
 
 ---
 
@@ -252,8 +252,6 @@ tauri::generate_handler![
     start_apache,
     stop_apache,
     get_php_versions,
-    switch_php_version,
-    download_php_version,
     list_php_extensions,
     toggle_php_extension,
     toggle_mysql,
@@ -364,4 +362,4 @@ These commands are part of the v0.1.19 source contract. They are native IPC comm
 
 `list_log_archives`, `read_log_archive`, `export_log_archive`, `delete_log_archive` and `open_log_archives` manage recognized diagnostic archives. `get_log_policy` and `set_log_policy` control opt-in rotation/retention. `run_log_maintenance` applies the saved policy and reports deferred or failed operations. These commands never handle MySQL binary/relay/redo/undo logs.
 
-Operations use DevStackBox's verified local MySQL connection. A selected initial database is not confinement for arbitrary imported SQL. Cancellation does not reverse SQL already applied. The grants editor refuses partial-revoke mode rather than changing global restrictions, and escapes database wildcard characters for ordinary database grants.
+Operations use LinuxDevStackBox's verified local MySQL connection. A selected initial database is not confinement for arbitrary imported SQL. Cancellation does not reverse SQL already applied. The grants editor refuses partial-revoke mode rather than changing global restrictions, and escapes database wildcard characters for ordinary database grants.

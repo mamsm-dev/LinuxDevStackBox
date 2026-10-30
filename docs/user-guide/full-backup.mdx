@@ -5,7 +5,7 @@ description: "Understand what the ZIP archive includes and how restoration affec
 
 # Full backup and restore
 
-Open **Settings → Backup & Restore**. A full backup combines selected DevStackBox files with an optional SQL export. It is not an image of the computer or every connected project.
+Open **Settings → Backup & Restore**. A full backup combines selected LinuxDevStackBox files with an optional SQL export. It is not an image of the computer or every connected project.
 
 ## Included and excluded contents
 
@@ -13,7 +13,7 @@ Open **Settings → Backup & Restore**. A full backup combines selected DevStack
 | --- | --- |
 | User configuration files | Yes, except excluded HTTPS/SSL material and the transient HTTPS operation lock |
 | Files in the installation's default www folder | Yes |
-| MySQL server SQL dump | Only when DevStackBox MySQL is running and the export succeeds |
+| MySQL server SQL dump | Only when LinuxDevStackBox MySQL is running and the export succeeds |
 | Files in connected project folders outside www | No; back them up separately |
 | Service logs, runtime binaries and terminal history | No |
 | HTTPS private material under config/https and config/ssl | No; provision/repair local HTTPS separately after recovery |

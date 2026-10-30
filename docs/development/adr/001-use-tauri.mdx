@@ -18,7 +18,7 @@ Use Tauri with a Rust backend as the desktop application framework.
 
 ## Context
 
-DevStackBox needs to:
+LinuxDevStackBox needs to:
 
 - Start and stop system processes (Apache, MySQL, PHP)
 - Read and write config files
@@ -61,3 +61,14 @@ Tauri was chosen because:
 - All IPC calls are async - frontend must handle loading states
 - Rust knowledge is required for any backend changes
 - Cross-platform builds require different CI environments (Windows for MSI, macOS for dmg)
+
+---
+
+## Linux migration update (2026)
+
+The decision holds on Linux. LinuxDevStackBox is now a Linux-only application built with Tauri 2:
+
+- Tauri 2 fully supports Linux via WebKitGTK (`webkit2gtk-4.1`), so the framework choice carries over unchanged.
+- The bundling target is now the Tauri `deb` and `rpm` bundle targets (plus a community-style `packaging/arch/PKGBUILD` for Arch); the MSI/NSIS targets from the original decision are gone.
+- Server binaries are no longer bundled with the app; they are resolved from distribution packages. This makes the small-framework argument even stronger - the package ships only the application, not the stack.
+- Cross-platform CI notes above are historical: the project now targets Linux only.

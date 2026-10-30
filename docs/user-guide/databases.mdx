@@ -9,7 +9,7 @@ Start MySQL before opening **Databases**. Open phpMyAdmin only when both Apache 
 
 ## Freshness and phpMyAdmin packaging
 
-DevStackBox keeps database/user lists in memory between visits and refreshes them in the background while their screen is visible. Database names are checked about every 15 seconds; size estimates about every 60 seconds; users about every 30 seconds. Refresh remains available for an immediate check. Changes in phpMyAdmin can appear on the next scheduled check or when returning to the app. Errors do not mean the database list is empty; previous results can be marked outdated. Caches are not saved across app restarts.
+LinuxDevStackBox keeps database/user lists in memory between visits and refreshes them in the background while their screen is visible. Database names are checked about every 15 seconds; size estimates about every 60 seconds; users about every 30 seconds. Refresh remains available for an immediate check. Changes in phpMyAdmin can appear on the next scheduled check or when returning to the app. Errors do not mean the database list is empty; previous results can be marked outdated. Caches are not saved across app restarts.
 
 New installer builds bundle the pmahomme phpMyAdmin theme only and hide the theme selector. Translations and offline help remain included. Older customized files can remain after an upgrade; cleanup does not remove unknown or edited files.
 

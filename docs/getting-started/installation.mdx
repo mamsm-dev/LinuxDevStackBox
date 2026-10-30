@@ -1,50 +1,61 @@
 ---
 title: "Installation"
-description: "Install DevStackBox on Windows 10 or 11."
+description: "Install LinuxDevStackBox on Arch, Debian or Fedora derivatives."
 icon: "Download"
 since: "0.1.6"
 ---
 
-# Install DevStackBox
+# Install LinuxDevStackBox
 
-DevStackBox ships as a Windows NSIS installer. Administrator rights are required because the default install location is `C:\devstackbox`.
+LinuxDevStackBox ships as a native package per distribution family: a `.pkg.tar.zst` for Arch (and derivatives), a `.deb` for Debian (and derivatives), and an `.rpm` for Fedora (and derivatives).
+
+Apache, MariaDB/MySQL, PHP and php-cgi are **not bundled**. They come from your distribution's packages. If a required binary is missing, the app refuses to start that service and prints the install command for your family.
 
 ## Download
 
-Get the latest **Windows x64 installer** from:
+Get the latest package for your distribution from [GitHub Releases](https://github.com/mamsm-dev/LinuxDevStackBox/releases/latest).
 
-- [devstackbox.com/download](https://www.devstackbox.com/download)
-- [GitHub Releases](https://github.com/DevStackBox/DevStackBox/releases/latest)
+## What the packages include
 
-## What the installer includes
+| Component | Source |
+| --------- | ------ |
+| phpMyAdmin | Bundled with the app (writable copy in the data dir) |
+| Apache | Distribution package |
+| MariaDB/MySQL | Distribution package |
+| PHP + php-cgi | Distribution package (minimum 8.2, single system runtime) |
 
-| Component | Version |
-| --------- | ------- |
-| PHP | 8.3 (default runtime) |
-| Apache | 2.4 |
-| MySQL | 8.4 LTS |
-| phpMyAdmin | 5.2 |
+## Install the distribution stack first
 
-Additional PHP branches (8.2, 8.4, 8.5) are downloaded from the app after install.
+If Apache, MariaDB and PHP are not already installed:
 
-## Install
+- **Arch:** `sudo pacman -S apache mariadb php php-cgi`
+- **Debian/Ubuntu:** `sudo apt install apache2 mariadb-server php php-cgi`
+- **Fedora:** `sudo dnf install httpd mariadb-server php php-cgi`
 
-1. Run the `.exe` installer (accept the UAC prompt when asked).
-2. Choose the install directory if prompted (default: `C:\devstackbox`).
-3. Launch DevStackBox from the Start Menu or desktop shortcut.
-4. Open the app and start Apache and MySQL when you need them.
-5. Open [http://localhost/phpmyadmin](http://localhost/phpmyadmin) to confirm the stack works.
+## Install LinuxDevStackBox
 
-## Auto-updates
+1. Install the package you downloaded with your package manager:
+   - **Arch:** `sudo pacman -U ./linuxdevstackbox-*.pkg.tar.zst`
+   - **Debian/Ubuntu:** `sudo apt install ./linuxdevstackbox_*.deb`
+   - **Fedora:** `sudo dnf install ./linuxdevstackbox-*.rpm`
+2. Launch LinuxDevStackBox from your application menu.
+3. Open the app and start Apache and MySQL when you need them. Services run as your logged-in user, never as root - do not run the whole app with sudo.
+4. Open [http://localhost:8080/phpmyadmin](http://localhost:8080/phpmyadmin) to confirm the stack works. Apache binds `127.0.0.1` on port 8080 by default; the port is configurable in the config editor.
 
-DevStackBox checks for updates and can install them in place. See [Upgrading](upgrading) for what happens during an upgrade.
+## Updates
+
+LinuxDevStackBox checks GitHub releases for a newer version and tells you to upgrade the package with your package manager. There is no self-install on Linux. See [Upgrading](upgrading).
 
 ## Uninstall
 
-Use Windows **Settings → Apps → Installed apps**, find DevStackBox, and uninstall. Your sites under `www` and data under `%LOCALAPPDATA%\devstackbox` are preserved according to the uninstaller options.
+- **Arch:** `sudo pacman -R linuxdevstackbox`
+- **Debian/Ubuntu:** `sudo apt remove linuxdevstackbox`
+- **Fedora:** `sudo dnf remove linuxdevstackbox`
+
+Your user data is **not** removed on uninstall: configs stay in `~/.config/linuxdevstackbox` and data (including `www`, logs, databases and backups) stays in `~/.local/share/linuxdevstackbox`. Delete those folders manually if you want a complete cleanup.
 
 ## Next steps
 
-- [Upgrading](upgrading) - in-place updates and `www` preservation
+- [Upgrading](upgrading) - updates and data preservation
 - [Troubleshooting](../advanced/troubleshooting) - if services fail to start
 - [Roadmap](../roadmap) - planned features

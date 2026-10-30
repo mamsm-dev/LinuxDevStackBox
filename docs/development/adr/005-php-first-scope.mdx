@@ -12,13 +12,13 @@ icon: "FileQuestion"
 
 ## Decision
 
-DevStackBox v1.0 supports only the PHP stack: Apache, PHP, MySQL, phpMyAdmin. No Node.js, Python, Redis, PostgreSQL, Docker, or Nginx.
+LinuxDevStackBox v1.0 supports only the PHP stack: Apache, PHP, MySQL, phpMyAdmin. No Node.js, Python, Redis, PostgreSQL, Docker, or Nginx.
 
 ---
 
 ## Context
 
-DevStackBox is a local development environment. The question arose: should it be a universal developer tool (like Docker Desktop) or a focused PHP stack (like Laragon)?
+LinuxDevStackBox is a local development environment. The question arose: should it be a universal developer tool (like Docker Desktop) or a focused PHP stack (like Laragon)?
 
 ---
 
@@ -35,7 +35,7 @@ DevStackBox is a local development environment. The question arose: should it be
 
 ## Decision Rationale
 
-1. **Focus**: The existing competition (XAMPP, WAMP, Laragon) is strong but dated. DevStackBox can win on UX and modernness for PHP developers. Spreading to other stacks dilutes this positioning.
+1. **Focus**: The existing competition (XAMPP, WAMP, Laragon) is strong but dated. LinuxDevStackBox can win on UX and modernness for PHP developers. Spreading to other stacks dilutes this positioning.
 2. **Complexity**: Each added runtime multiplies the testing surface, installer size, and maintenance burden. Node version management alone (nvm-windows, fnm, Volta) is a solved problem with better tools.
 3. **Target user**: WordPress, Laravel, Symfony, and CodeIgniter developers are a large, underserved market for modern local dev tooling.
 4. **Architecture impact**: Supporting multiple runtimes requires a plugin architecture from the start. Building that before the core is solid is premature.
@@ -50,7 +50,6 @@ DevStackBox is a local development environment. The question arose: should it be
 - MySQL is the project's decided database (bundled portable distribution)
 - A plugin/extension system for additional stacks can be designed after v1.0 ships
 - The product positioning is: "The modern PHP local development stack for Windows"
-
 ---
 
 ## What This Means for Architecture
@@ -75,3 +74,14 @@ After v1.0 ships with a stable user base, evaluate:
 - Most requested "other stack" from user issues
 - Whether a plugin/extension architecture makes sense
 - Start with the most-requested option only (likely Node.js for Laravel mix/Vite compatibility)
+
+---
+
+## Linux migration update (2026)
+
+The PHP-first scope carries over to Linux unchanged: the stack is still Apache + PHP + MySQL/MariaDB + phpMyAdmin, with no Node.js, Python, PostgreSQL, Redis, Docker or Nginx.
+
+Two implementation details changed while the scope held:
+
+- The servers are no longer bundled. Apache, MySQL/MariaDB and PHP (minimum 8.2) are resolved from distribution packages (Arch, Debian, Fedora families), so "all backend commands, installer size, and UI are optimized for PHP development" now means package dependencies instead of payload size.
+- PHP version switching and downloads from the original app have no Linux equivalent; upgrades happen through the package manager. The positioning line above is historical - the product is now "The modern PHP local development stack for Linux".

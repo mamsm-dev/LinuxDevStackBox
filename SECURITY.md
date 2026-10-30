@@ -1,40 +1,43 @@
-# DevStackBox - Security Policy
+# LinuxDevStackBox - Security Policy
 
 ## Supported versions
 
 | Version | Security fixes |
 | ------- | -------------- |
-| v0.1.11+ | Yes |
-| Older   | Update to latest release |
+| v0.1.22+ (Linux) | Yes |
+| Older, Windows builds | Not supported; the Windows platform is end-of-life |
 
 ## Report a vulnerability
 
-Email **hello@devstackbox.com**. Do not use public GitHub issues for security reports.
+Open a private security advisory via [GitHub Security Advisories](https://github.com/mamsm-dev/LinuxDevStackBox/security/advisories/new) for this repository. Do not use public GitHub issues for security reports.
 
-Include version, OS, steps to reproduce, and impact. We respond within 7 days.
+Include version, distribution, steps to reproduce, and impact.
 
-## What DevStackBox does locally
+## What LinuxDevStackBox does locally
 
-- Starts and stops Apache, MySQL, and PHP
-- Reads and writes config files on your PC
-- Downloads PHP builds from `windows.php.net` when you choose **Download** on the PHP Versions page
-- May edit the Windows `hosts` file for virtual hosts (with your consent)
+- Starts and stops the distribution Apache and MySQL/MariaDB binaries as your user, with generated configuration under your XDG config directory
+- Reads and writes config files in `~/.config/linuxdevstackbox` and data in `~/.local/share/linuxdevstackbox`
+- May edit `/etc/hosts` for `.test` hostnames - one fixed-argument `pkexec` prompt per change, performed by the app binary acting as a narrow helper
+- May install the local HTTPS CA anchor into the system trust store - also via a single `pkexec` prompt, followed by the distribution's trust-bundle refresh tool
 - Opens `localhost` in your browser
+
+The graphical application itself never runs with root privileges.
 
 ## What it does not do
 
 - No telemetry or usage analytics
 - No background cloud sync
 - No account system
+- No download of server runtimes: Apache, MySQL/MariaDB and PHP come exclusively from your distribution's signed packages
 
-## PHP downloads
+## Credential storage
 
-Downloads use HTTPS from `windows.php.net`. The app verifies SHA-256 checksums from the official release metadata before extracting.
+An optional MySQL root password set through the UI is stored in a `0600` file in `~/.config/linuxdevstackbox/`, readable only by your user.
 
-## Windows SmartScreen
+## Local HTTPS
 
-The installer is signed for in-app updates (minisign). It is not Windows Authenticode-signed. If SmartScreen warns about an unknown publisher, verify that the file came from the official GitHub release and compare its SHA-256 digest where provided. Only continue if you trust the source. Updater signature verification does not establish Windows publisher identity. See [Downloads](https://www.devstackbox.com/download).
+The app generates a private per-user certificate authority with the system `openssl` and stores its key with `0600` permissions under your config directory. Installing that CA into the system trust store makes sites it signs trusted by browsers on this machine only.
 
-## Binary integrity
+## Package integrity
 
-Install to a folder you control (default `C:\devstackbox`). Do not run from untrusted network shares.
+Install packages only from the official [GitHub Releases](https://github.com/mamsm-dev/LinuxDevStackBox/releases) page or a repository you trust. SHA-256 digests for release packages are published in the release notes; verify them before installing.

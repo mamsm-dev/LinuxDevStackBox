@@ -215,7 +215,7 @@ Use bounded checks and timestamps; invalidate stale results after changes.
 
 Support zero or multiple named connections per project. Create a local database
 with a dedicated user or link an existing one; do not default applications to the
-server root account. Keep “linked in DevStackBox”, “connection verified” and
+server root account. Keep “linked in LinuxDevStackBox”, “connection verified” and
 “application configured” separate.
 
 Provide direct phpMyAdmin links, test connection, masked connection details,
@@ -408,7 +408,7 @@ publisher values, not the Tauri identifier or a guessed certificate subject.
 - Application state: per-channel package state for settings and disposable cache.
   Resolve with supported APIs rather than assuming an environment variable is physical.
 - Persistent workspace: user-selected ordinary folder, with a proposed default under
-  the user's home directory such as DevStackBox. Keep projects, database storage and
+  the user's home directory such as LinuxDevStackBox. Keep projects, database storage and
   user-exported backups outside the package; test access with Explorer/editors and
   after uninstall. Store runtime downloads in a protected user-writable runtime area;
   choose exact location after identity/virtualization proof. Do not request broad

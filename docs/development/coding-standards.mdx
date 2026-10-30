@@ -4,9 +4,9 @@ description: "Writing, UI, and terminology guidelines."
 icon: "FileText"
 ---
 
-# DevStackBox Writing Guidelines
+# LinuxDevStackBox Writing Guidelines
 
-Product-wide rules for UI, installer, documentation, release notes, and changelog.
+Product-wide rules for UI, packages, documentation, release notes, and changelog.
 
 See also: [Terminology](#terminology), [UI Guidelines](#devstackbox-ui-guidelines).
 
@@ -14,7 +14,7 @@ See also: [Terminology](#terminology), [UI Guidelines](#devstackbox-ui-guideline
 
 ## Voice
 
-DevStackBox communicates like a professional developer tool.
+LinuxDevStackBox communicates like a professional developer tool.
 
 Writing should be:
 
@@ -32,7 +32,7 @@ Avoid:
 - Humor inside system messages
 - Excessive punctuation
 
-Target tone: VS Code, Windows Terminal, JetBrains, Visual Studio.
+Target tone: VS Code, JetBrains, Visual Studio.
 
 ---
 
@@ -187,7 +187,7 @@ Do not mix: `a moment ago`, `secs ago`, `few seconds ago`.
 
 ---
 
-## Installer and uninstaller progress log
+## Package install, upgrade and removal messages
 
 Human, Visual Studio-style. Not verbose.
 
@@ -198,10 +198,9 @@ Apache stopped.
 Stopping MySQL...
 MySQL stopped.
 
-Removing application files...
-Removing shortcuts...
-Removing registry entries...
-Removing user data...
+Backing up user configuration...
+Applying package files...
+Preserving projects and databases...
 
 Completed.
 ```
@@ -212,13 +211,13 @@ Branded component names in logs: `Apache`, `MySQL`, `PHP`, `phpMyAdmin`.
 
 ## Scope
 
-These rules apply to: app UI, README, installer/uninstaller, docs, release notes, and changelog.
+These rules apply to: app UI, README, packages, docs, release notes, and changelog.
 
 
 ---
 
 
-# DevStackBox Terminology
+# LinuxDevStackBox Terminology
 
 Glossary for consistent product language. When in doubt, use the **Preferred** term.
 
@@ -229,22 +228,22 @@ Glossary for consistent product language. When in doubt, use the **Preferred** t
 | application | app | OK in technical docs only |
 | terminal | console | UI label |
 | restart | reboot | Services and application |
-| remove | erase, delete (when uninstalling) | uninstall context: remove |
-| install | setup | Installer wording |
+| remove | erase, delete (when uninstalling) | removal context: remove |
+| install | setup | Package install wording |
 | update | upgrade | In-app updater |
 | Apache | apache | Log labels and titles |
 | MySQL | mysql | Log labels and titles |
 | phpMyAdmin | phpmyadmin | Log labels only; folder stays lowercase |
 
-Install location: `C:\devstackbox`
+App files (packages): `/usr/bin/linuxdevstackbox`, `/usr/lib/linuxdevstackbox`
 
-Application data: `%LOCALAPPDATA%\devstackbox`
+Application data: `~/.local/share/linuxdevstackbox` (config: `~/.config/linuxdevstackbox`)
 
 
 ---
 
 
-# DevStackBox UI Guidelines
+# LinuxDevStackBox UI Guidelines
 
 Stub - expand as the design system matures. Writing rules are in the first section of this page.
 
@@ -272,7 +271,7 @@ See [Icon Guidelines](#devstackbox-icon-guidelines) below.
 ---
 
 
-# DevStackBox Color Guidelines
+# LinuxDevStackBox Color Guidelines
 
 Stub - expand later.
 
@@ -284,7 +283,7 @@ Destructive actions use the `destructive` button variant and semantic error colo
 ---
 
 
-# DevStackBox Icon Guidelines
+# LinuxDevStackBox Icon Guidelines
 
 Stub - expand later.
 

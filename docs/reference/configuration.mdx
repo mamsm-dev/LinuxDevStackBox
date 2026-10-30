@@ -6,7 +6,7 @@ icon: "Settings"
 
 # Configuration reference
 
-Quick reference for DevStackBox service defaults. For port conflicts, localhost binding, and firewall behavior, see [Environment & Networking](../advanced/environment).
+Quick reference for LinuxDevStackBox service defaults. For port conflicts, localhost binding, and firewall behavior, see [Environment & Networking](../advanced/environment).
 
 ## Default ports
 
@@ -23,7 +23,7 @@ Apache and MySQL bind to `127.0.0.1` by default (localhost only).
 Runtime configs are generated and stored under the user data root:
 
 ```
-%LOCALAPPDATA%\DevStackBox\
+%LOCALAPPDATA%\LinuxDevStackBox\
   config\
     httpd.conf
     my.cnf
@@ -32,7 +32,7 @@ Runtime configs are generated and stored under the user data root:
   config-backups\    timestamped .bak files from in-app edits
 ```
 
-The install directory (`C:\devstackbox` by default) holds binaries and the default `www` folder served by localhost. Connected projects can stay in any accessible local folder, including another drive. Edit configs from the DevStackBox UI or directly in `%LOCALAPPDATA%\DevStackBox\config\`.
+The install directory (`~/.local/share/linuxdevstackbox` by default) holds binaries and the default `www` folder served by localhost. Connected projects can stay in any accessible local folder, including another drive. Edit configs from the LinuxDevStackBox UI or directly in `%LOCALAPPDATA%\LinuxDevStackBox\config\`.
 
 Override the user data root with the `DEVSTACKBOX_DATA_DIR` environment variable (advanced).
 

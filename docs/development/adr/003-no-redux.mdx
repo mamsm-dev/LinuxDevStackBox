@@ -18,7 +18,7 @@ Do not use Redux, Zustand, Jotai, or any other global state manager. Use React's
 
 ## Context
 
-Frontend state in DevStackBox is:
+Frontend state in LinuxDevStackBox is:
 
 - Service statuses (running/stopped) - polled every 5 seconds
 - UI state (sidebar open, modals open, current page)
@@ -40,7 +40,7 @@ Frontend state in DevStackBox is:
 
 ## Decision Rationale
 
-1. **App is small**: DevStackBox has a handful of pages and a small component tree. Global state management adds overhead that is not justified.
+1. **App is small**: LinuxDevStackBox has a handful of pages and a small component tree. Global state management adds overhead that is not justified.
 2. **Service state is ephemeral**: Service status is polled from the OS every 5 seconds anyway. There is no need for optimistic updates or complex state transitions.
 3. **Prop drilling is not deep**: The component tree is shallow enough that prop passing does not become painful.
 4. **Simplicity**: Any contributor can understand `useState` without learning a state library.

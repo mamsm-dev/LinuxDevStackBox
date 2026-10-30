@@ -1,11 +1,11 @@
 ---
 title: "Building from Source"
-description: "Set up a local DevStackBox development environment."
+description: "Set up a local LinuxDevStackBox development environment."
 icon: "Hammer"
 ---
-# DevStackBox - Development Guide
+# LinuxDevStackBox - Development Guide
 
-**How to run, build, debug, and extend DevStackBox without breaking things.**  
+**How to run, build, debug, and extend LinuxDevStackBox without breaking things.**  
 Read this before writing any new code.
 
 ---
@@ -15,16 +15,24 @@ Read this before writing any new code.
 | Tool      | Version | Install                             |
 | --------- | ------- | ----------------------------------- |
 | Node.js   | 24 LTS     | [nodejs.org](https://nodejs.org/)   |
-| pnpm      | latest  | `npm install -g pnpm`               |
+| npm       | bundled with Node.js | -                        |
 | Rust      | stable  | [rustup.rs](https://rustup.rs/)     |
 | Tauri CLI | 2.x     | bundled in devDependencies          |
 | Git       | any     | [git-scm.com](https://git-scm.com/) |
+
+LinuxDevStackBox is Linux-only and supports the Arch, Debian, and Fedora families. Your system also needs the WebKitGTK build dependency plus base build tools:
+
+| Distro family | Package                                        |
+| ------------- | ---------------------------------------------- |
+| Arch          | `webkit2gtk-4.1` + `base-devel`                |
+| Debian        | `libwebkit2gtk-4.1-dev` + `build-essential`    |
+| Fedora        | `webkit2gtk4.1-devel`                          |
 
 Verify your setup:
 
 ```bash
 node --version   # 24 LTS
-pnpm --version
+npm --version
 rustc --version
 cargo --version
 ```
@@ -34,40 +42,39 @@ cargo --version
 ## 2. First-Time Setup
 
 ```bash
-git clone https://github.com/DevStackBox/DevStackBox.git
-cd DevStackBox
+git clone https://github.com/mamsm-dev/LinuxDevStackBox.git
+cd LinuxDevStackBox
 npm ci
 ```
 
-The service binaries (MySQL, Apache, PHP) must be present in their directories:
+LinuxDevStackBox does **not** bundle Apache, MySQL/MariaDB, PHP, or phpMyAdmin server binaries. At runtime the app resolves them from your distribution packages:
 
-- `mysql/bin/mysqld.exe`
-- `apache/bin/httpd.exe`
-- `php/8.3/php.exe`
+- Apache: `httpd` (Arch/Fedora) or `apache2` (Debian)
+- MySQL/MariaDB: `mysqld` or `mariadbd` (flavor auto-detected), plus the `mysql`/`mariadb`, `mysqldump`/`mariadb-dump` and `mysqladmin`/`mariadb-admin` clients
+- PHP: `php` and `php-cgi` (minimum 8.2)
+- Certificates: the system `openssl`
 
-Verify the checkout with `node scripts/verify-release.mjs`. The repository tracks bundled service resources; do not substitute XAMPP binaries. Missing or outdated resources must be restored from the project or refreshed through the maintained PHP/MySQL/phpMyAdmin refresh scripts and verified before building. Bundled PHP 8.3 is refreshed with `.\scripts\refresh-php-bundle.ps1 -Branch 8.3` when windows.php.net publishes a new patched build.
+Install the service packages for your distribution (the packaged app declares them as dependencies) before running the app locally.
 
 ---
 
 ## 3. Running in Development
 
 ```bash
-pnpm tauri dev
-# or
 npm run tauri:dev
 ```
 
 This starts:
 
 1. Vite dev server on `http://localhost:1420`
-2. Tauri shell with the Rust backend
+2. Tauri shell with the Rust backend (`cargo run`)
 
 Hot reload works for frontend changes. Rust changes require a full rebuild (happens automatically).
 
 **Browser-only mode (no Tauri):**
 
 ```bash
-pnpm dev
+npm run dev
 ```
 
 Opens just the frontend in a browser. All Tauri commands return null (safeInvoke handles this). Useful for fast UI development.
@@ -77,19 +84,26 @@ Opens just the frontend in a browser. All Tauri commands return null (safeInvoke
 ## 4. Building for Production
 
 ```bash
-pnpm tauri:build
-# or
-npm run tauri:build
+npm run build        # tsc + vite build; the prebuild stage stages phpMyAdmin via scripts/stage-phpmyadmin.mjs
+cargo build --release   # run inside src-tauri/
+```
+
+Or the one-shot packaging command:
+
+```bash
+npx tauri build --bundles deb rpm
 ```
 
 Produces:
 
-- `src-tauri/target/release/bundle/nsis/DevStackBox_0.1.22_x64-setup.exe`
+- `src-tauri/target/release/bundle/deb/` - Debian package
+- `src-tauri/target/release/bundle/rpm/` - RPM package
+
+The `deb` and `rpm` bundle targets are configured in `src-tauri/tauri.conf.json`. Arch packaging uses `packaging/arch/PKGBUILD` (see reference/installer).
 
 **Pre-build check:**
 
-- Version must be clean semver in ALL THREE places: `package.json`, `src-tauri/Cargo.toml`, `src-tauri/tauri.conf.json`
-- No emoji in GitHub Actions `.yml` files (causes PowerShell encoding errors)
+- Version must be clean semver and identical in ALL THREE places: `package.json`, `src-tauri/Cargo.toml`, `src-tauri/tauri.conf.json`
 
 ---
 
@@ -99,7 +113,7 @@ Read this before designing or modifying any UI component.
 
 ### Design Philosophy
 
-DevStackBox must feel like a **native desktop utility** - like Docker Desktop, GitHub Desktop, or Warp.  
+LinuxDevStackBox must feel like a **native desktop utility** - like Docker Desktop, GitHub Desktop, or Warp.  
 It must NOT look like: a web admin panel, a cPanel clone, analytics dashboard, or enterprise CMS.
 
 This mindset changes everything. When in doubt, ask: "does this look like a desktop app or a website?"
@@ -116,7 +130,7 @@ Do NOT show everything at once. Overloaded UIs drive users away.
 ### Layout Rules (do not change these)
 
 - Two-panel layout: fixed sidebar (220-260px) + main content area
-- Top bar: app title, version badge, auto updater, language switcher, theme toggle
+- Top bar: app title, version badge, update check, language switcher, theme toggle
 - Command palette: keyboard-driven via `Ctrl+P` in the current implementation
 - Sidebar: EXACTLY 6 items in the current app - Dashboard, Services, Projects, Logs, Settings, About
 - Main area: card-based, spacious, clean - no dense tables, no charts
@@ -129,7 +143,7 @@ Each service card follows this exact structure:
 
 ```text
 [ Apache ]          Running ●
-Port: 80   PID: 1234
+Port: 8080   PID: 1234
 [ Start ]  [ Stop ]  [ Logs ]  [ Config ]
 ```
 
@@ -153,7 +167,6 @@ Add any new quick action to the command palette. Example entries:
 > Start Apache
 > Stop MySQL
 > Open php.ini
-> Switch PHP 8.4
 > Open www/ folder
 ```
 
@@ -204,7 +217,7 @@ Add any new quick action to the command palette. Example entries:
 
 **Commands:**
 
-- All commands go in `src-tauri/src/lib.rs`
+- All commands go in `src-tauri/src/lib.rs` or the owning module under `src-tauri/src/commands/`
 - Do NOT add code to `service_manager.rs` (it is dead code, see advanced/troubleshooting)
 - Commands must return `Result<T, String>`
 - Long-running operations must be `async`
@@ -213,7 +226,7 @@ Add any new quick action to the command palette. Example entries:
 **Paths:**
 
 - Never hardcode absolute paths
-- Use `get_installation_path()` to get the base path
+- Use the path helpers in `src-tauri/src/utils/paths.rs` (`get_installation_path()`, `get_user_config_root()`, `get_user_data_root()`)
 - Prefer `base_path.join("subdir").join("file")` over string concatenation
 
 **Errors:**
@@ -266,7 +279,6 @@ Add any new quick action to the command palette. Example entries:
    ```rust
    #[tauri::command]
    async fn my_command(service: String) -> Result<String, String> {
-       let base_path = get_installation_path();
        // ... your logic ...
        Ok("done".to_string())
    }
@@ -339,7 +351,7 @@ Version must be identical in all three files. Change all three at once:
 2. `src-tauri/Cargo.toml` - `version = "0.1.22"`
 3. `src-tauri/tauri.conf.json` - `"version": "0.1.22"`
 
-Rule: Version must be clean semver only: `X.Y.Z` - no hyphens, no letters (MSI requirement).
+Rule: Version must be clean semver only: `X.Y.Z` - no hyphens, no letters. Keep the version in `package-lock.json` and `Cargo.lock` synchronized with the same change.
 
 ---
 
@@ -353,19 +365,19 @@ Rule: Version must be clean semver only: `X.Y.Z` - no hyphens, no letters (MSI r
 
 **Rust debugging:**
 
-- Use `println!()` - output appears in the terminal where `pnpm tauri dev` is running
+- Use `println!()` - output appears in the terminal where `npm run tauri:dev` is running
 - Use `DebugPanel.tsx` component - it calls `debug_paths` and `debug_installation` commands to show resolved paths
 
 **Service path issues:**
 
 - Call `debug_installation` from `DebugPanel` to see where Rust is looking for binaries
-- Most bugs are path resolution failures - check `get_installation_path()` logic in `lib.rs`
+- Most bugs are binary or path resolution failures - check `get_installation_path()` and the XDG root helpers in `src-tauri/src/utils/paths.rs`
 
 **Common errors:**
 
-- `binary not found at ...` - service binary missing from the expected path
+- `binary not found at ...` - the distribution package providing the server binary is not installed
 - `port X is not listening` - service started but crashed immediately; check logs
-- `Architecture mismatch` - Apache 32-bit on 64-bit build; download 64-bit Apache
+- `PHP 8.2 or newer is required` - the installed distro PHP is too old for Apache to serve
 
 ---
 
@@ -405,12 +417,13 @@ Do NOT push with `--force` unless you know exactly what you are doing.
 
 ---
 
-## 16. Common pnpm Commands
+## 16. Common npm Commands
 
 ```bash
-pnpm install              # Install all dependencies
-pnpm dev                  # Frontend only (browser)
-pnpm tauri dev            # Full app (Tauri + frontend)
-pnpm tauri:build          # Production build
-pnpm tauri -- --version   # Check Tauri CLI version
+npm ci                    # Install all dependencies
+npm run dev               # Frontend only (browser)
+npm run tauri:dev         # Full app (Tauri + frontend)
+npm run build             # Frontend production build (stages phpMyAdmin)
+npm test                  # Vitest unit tests
+npx tauri -- --version    # Check Tauri CLI version
 ```

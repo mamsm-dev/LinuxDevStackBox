@@ -1,63 +1,86 @@
-# DevStackBox
+# LinuxDevStackBox
 
-![Release](https://img.shields.io/github/v/release/DevStackBox/DevStackBox?style=flat-square)
-![License: MIT](https://img.shields.io/github/license/DevStackBox/DevStackBox?style=flat-square)
-![Windows 10/11](https://img.shields.io/badge/Windows-10%20%7C%2011-0078D4?style=flat-square&logo=windows&logoColor=white)
+![Release](https://img.shields.io/github/v/release/mamsm-dev/LinuxDevStackBox?style=flat-square)
+![License: MIT](https://img.shields.io/github/license/mamsm-dev/LinuxDevStackBox?style=flat-square)
+![Linux](https://img.shields.io/badge/Linux-Arch%20%7C%20Debian%20%7C%20Fedora-FCC624?style=flat-square&logo=linux&logoColor=black)
 
-**Free XAMPP alternative for Windows** - Apache, MySQL 8.4 LTS, phpMyAdmin, and PHP 8.3 in one MIT-licensed desktop app.
+**A local PHP development environment for Linux** - Apache, MariaDB/MySQL, phpMyAdmin and PHP managed from one MIT-licensed desktop app, using the runtimes your distribution already ships.
 
-![DevStackBox v0.1.17 Services](docs/images/services-v0.1.17-hd.jpg)
+![LinuxDevStackBox v0.1.17 Services](docs/images/services-v0.1.17-hd.jpg)
 
-Project details from an earlier development build. See [CHANGELOG.md](CHANGELOG.md) for the latest release notes.
+Screenshot from an earlier development build. See [CHANGELOG.md](CHANGELOG.md) for the latest release notes.
 
-## Stack
+## How it works
 
-| In the installer   | In the app (download)                        |
-| ------------------ | -------------------------------------------- |
-| PHP **8.3.36**     | PHP **8.2.35, 8.4.27, 8.5.12** or newer patches |
-| Apache **2.4**     | -                                            |
-| MySQL **8.4 LTS**  | -                                            |
-| phpMyAdmin **5.2** | -                                            |
+LinuxDevStackBox does not bundle web servers. It drives the Apache, MariaDB/MySQL and PHP packages installed by your distribution, generates per-user configuration, and runs everything as your user - no root, no system services touched:
 
-XAMPP for Windows ships PHP 8.2. DevStackBox gives you 8.3 immediately and 8.5 when you need it.
+| Component | Source | Default |
+| --------- | ------ | ------- |
+| Apache | `apache` / `apache2` / `httpd` package | `http://localhost:8080/` |
+| MySQL or MariaDB | `mariadb` / `mariadb-server` package | `127.0.0.1:3306` |
+| PHP + php-cgi | `php` package (8.2 or newer) | CGI handler + `php` CLI |
+| phpMyAdmin | bundled inside the app | `http://localhost:8080/phpmyadmin/` |
 
-## Download
+Configuration lives in `~/.config/linuxdevstackbox/` (httpd.conf, my.cnf, php.ini, site records) and runtime data in `~/.local/share/linuxdevstackbox/` (logs, database data, your `www/` projects). Both follow the XDG Base Directory Specification and can be redirected with `LINUXDEVSTACKBOX_DATA_DIR`.
 
-[devstackbox.com/download](https://www.devstackbox.com/download) · [GitHub Releases](https://github.com/DevStackBox/DevStackBox/releases/latest)
+## Install
 
-1. Run the installer (administrator).
-2. Start Apache and MySQL from the app.
-3. Open `http://localhost/` and `http://localhost/phpmyadmin/`.
+Pick the package for your distribution family from [GitHub Releases](https://github.com/mamsm-dev/LinuxDevStackBox/releases/latest):
+
+```sh
+# Arch Linux and derivatives
+sudo pacman -U ./linuxdevstackbox-*.pkg.tar.zst
+sudo pacman -S --needed apache mariadb php php-cgi   # runtime dependencies
+
+# Debian and derivatives
+sudo apt install ./linuxdevstackbox_*.deb
+
+# Fedora and derivatives
+sudo dnf install ./linuxdevstackbox-*.rpm
+```
+
+The `.deb` and `.rpm` declare their runtime dependencies automatically; on Arch install them once as shown. Then:
+
+1. Launch **LinuxDevStackBox** from your application menu.
+2. Start Apache and MySQL from the Services page.
+3. Open `http://localhost:8080/` and `http://localhost:8080/phpmyadmin/`.
+
+Uninstall with `sudo pacman -R linuxdevstackbox`, `sudo apt remove linuxdevstackbox` or `sudo dnf remove linuxdevstackbox`; your projects and data are kept.
 
 ## Features
 
-- One desktop UI for services, configs, SSL, backups, and projects
-- Import from XAMPP (`Settings → Import from XAMPP`)
-- No telemetry · offline-friendly after install
+- One desktop UI for services, configs, virtual hosts, trusted local HTTPS, database tooling, backups and projects
+- Per-user configuration generated for the distribution Apache/MySQL/PHP; system services are never modified
+- `.test` hostnames mapped in `/etc/hosts` (single polkit prompt per change) and a private local CA installed into the system trust store for trusted `https://` sites
+- phpMyAdmin with upload/save directories and import limits tuned per user
+- Embedded terminal with your login shell, `php -a` and a MySQL CLI session
+- Full backups of `www/`, configuration and databases; import from XAMPP (`/opt/lampp`)
+- Update checks that point you at the matching package-manager upgrade
+- No telemetry; everything works offline after installation
 
 ## Docs
 
-[devstackbox.com/docs](https://www.devstackbox.com/docs)
+The user and developer documentation lives in [docs/](docs/index.mdx).
 
-Using an AI coding tool? Give it [DEVSTACKBOX.md](DEVSTACKBOX.md) for runtime discovery, project setup and database guidance.
+Using an AI coding tool? Give it [LINUXDEVSTACKBOX.md](LINUXDEVSTACKBOX.md) for runtime discovery, project setup and database guidance.
 
 ## Project workspaces
 
-Connect existing folders, manage `.test` hosts and trusted HTTPS, and select an installed PHP version per website. Download extra runtimes in PHP Versions first. The terminal currently uses global PHP.
+Connect existing folders, manage `.test` hosts and trusted HTTPS, and set PHP handling per website. See the [project guide](docs/getting-started/projects.mdx), the [project roadmap](PROJECT-ROADMAP.md), and [release validation](docs/RELEASE-VALIDATION.md).
 
-See the [project guide](docs/getting-started/projects.mdx), [project roadmap](PROJECT-ROADMAP.md), and [release validation](docs/RELEASE-VALIDATION.md). Framework installers, database linking and Git/SSH are future work. Frameworks will download on demand; AI integration is deferred.
+## Building from source
 
-## v0.1.17
+Requires Node.js 20+, Rust and the WebKitGTK development libraries of your distribution (for example `webkit2gtk-4.1` on Arch):
 
-Released on 23 October 2026, v0.1.17 fixes Apache ancestor `.htaccess` handling and adds configuration/log diagnostics. Published artifact verification and remaining installed-site checks are tracked in [release validation](docs/RELEASE-VALIDATION.md). See the [documentation and cleanup audit](docs/development/v0.1.17-docs-audit.md) for readiness gates and proposed cleanup; no development files were deleted.
+```sh
+npm ci
+npm run build
+cargo build --release --manifest-path src-tauri/Cargo.toml
+# or build installable packages directly:
+npx tauri build --bundles deb rpm
+```
 
-## Releasing
-
-Maintainers: follow [Release process](docs/development/release-process.mdx) and the [Release runbook](docs/development/release-runbook.mdx) for signed builds, `finalize-release`, and GitHub publication. Download links for users always resolve to the [latest published GitHub release](https://github.com/DevStackBox/DevStackBox/releases/latest).
-
-## Diagnostics and configuration safety
-
-Read Apache and the selected PHP runtime error log from project details. Site changes preserve recovery copies and stop before overwriting unrelated hosts missing from saved records. See [release notes](CHANGELOG.md) for scope and limitations.
+The Arch package is built from [packaging/arch/PKGBUILD](packaging/arch/PKGBUILD). See the [building guide](docs/development/building.mdx) for details.
 
 ## Contributing
 
@@ -65,6 +88,6 @@ See [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## Links
 
-- Website: [devstackbox.com](https://www.devstackbox.com)
-- Issues: [GitHub Issues](https://github.com/DevStackBox/DevStackBox/issues)
-- Security: [SECURITY.md](SECURITY.md) · Privacy: [PRIVACY.md](PRIVACY.md)
+- Repository: [github.com/mamsm-dev/LinuxDevStackBox](https://github.com/mamsm-dev/LinuxDevStackBox)
+- Issues: [GitHub Issues](https://github.com/mamsm-dev/LinuxDevStackBox/issues)
+- Security: [SECURITY.md](SECURITY.md) - Privacy: [PRIVACY.md](PRIVACY.md)

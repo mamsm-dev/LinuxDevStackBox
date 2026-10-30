@@ -1,89 +1,93 @@
 ---
-title: "Installer & Updates"
-description: "NSIS installer, paths, and auto-update architecture."
+title: "Packaging & Updates"
+description: "Linux packages, paths, and update checks."
 icon: "Package"
 ---
 
-# Installer and updates
+# Packaging and updates
 
-The primary DevStackBox download is the Windows NSIS installer. Use GitHub Releases to check which assets are available for a particular version. This page describes install paths, how user data is kept separate from app binaries, and how updates work today vs what Phase 4 adds.
+LinuxDevStackBox ships as Linux packages for the Arch, Debian, and Fedora families. Use GitHub Releases to check which assets are available for a particular version. This page describes package contents, how user data is kept separate from package-managed files, and how update checks work.
 
-## Installers
+## Packages
 
-The download page displays the actual installer size from GitHub.
+| Family | Package | Built with | Server dependencies declared |
+| --- | --- | --- | --- |
+| Debian | `.deb` | Tauri bundler (`deb` target) | `apache2`, `mariadb-server`, `php`, `php-cgi`, `libnss3-tools`, `openssl`, `policykit-1` |
+| Fedora family | `.rpm` | Tauri bundler (`rpm` target) | `httpd`, `mariadb-server`, `php`, `php-cgi`, `openssl`, `polkit` |
+| Arch | PKGBUILD | `makepkg -f` from `packaging/arch/PKGBUILD` | `apache`, `mariadb`, `mariadb-clients`, `php`, `php-cgi`, `openssl` (`polkit` optional) |
 
-Installation requires **Windows 10/11 (64-bit)** and administrator rights for installation.
-
-**Default install directory:** `C:\devstackbox` (you can choose another path during setup).
+The server dependencies are hard runtime requirements: LinuxDevStackBox does not bundle Apache, MySQL/MariaDB, PHP, or openssl. It resolves them from the distribution packages at runtime.
 
 Download: [devstackbox.com/download](https://www.devstackbox.com/download)
 
+## Package layout
+
+All packages install the same files:
+
+```
+/usr/bin/linuxdevstackbox                        application binary
+/usr/lib/linuxdevstackbox/phpmyadmin/            read-only phpMyAdmin runtime payload
+/usr/share/applications/com.mam.linuxdevstackbox.desktop   desktop entry (Arch package)
+/usr/share/icons/hicolor/<size>/apps/linuxdevstackbox.png  hicolor icons (Arch package)
+```
+
+The `.deb` and `.rpm` register their dependencies and desktop integration through the Tauri bundler; the Arch package installs the binary, phpMyAdmin payload, desktop entry, icons and license explicitly.
+
 ## App vs data directory separation
 
-DevStackBox separates **replaceable app files** from **user data** to keep runtime data separate from bundled binaries; always back up projects and databases before an update. See [ADR 006](../development/adr/006-app-data-separation) for the full decision record.
+LinuxDevStackBox separates **package-managed files** from **user data** so package installs, upgrades and removals never touch user state; always back up projects and databases before an upgrade. See [ADR 006](../development/adr/006-app-data-separation) for the full decision record.
 
-**Install directory** (contains binaries and the project folder; do not delete it wholesale):
-
-```
-C:\devstackbox\
-  DevStackBox.exe
-  apache/
-  php/
-  mysql/
-  phpmyadmin/
-  resources/
-  www/              web projects (preserved by the installer)
-```
-
-**User data root** (never touched by the updater or installer uninstall options that preserve data):
+**Package-managed files** (replaced by package upgrades):
 
 ```
-%LOCALAPPDATA%\DevStackBox\
+/usr/bin/linuxdevstackbox
+/usr/lib/linuxdevstackbox/
+```
+
+**Config root** (generated, user-editable; never touched by packages):
+
+```
+$XDG_CONFIG_HOME/linuxdevstackbox/      (default ~/.config/linuxdevstackbox)
+  httpd.conf        generated Apache config
+  my.cnf            generated MySQL config
+  php.ini           generated PHP config
+  vhosts.json       virtual host records
+  https/            local CA and certificates
+  mysql-root.json   MySQL root credentials (0600)
+```
+
+**Data root** (mutable runtime data; never touched by packages):
+
+```
+$XDG_DATA_HOME/linuxdevstackbox/        (default ~/.local/share/linuxdevstackbox)
+  www/              project web root
   mysql-data/       MySQL data directory
-  config/           runtime Apache, MySQL, PHP configs
-  config-backups/   automatic config backups
   logs/             service logs
   backups/          full backups created in-app
+  config-backups/   automatic config backups
+  phpmyadmin/       writable phpMyAdmin copy (cloned on first run)
+  cgi-bin/          staged php-cgi symlink
 ```
 
-Override the user data path with `DEVSTACKBOX_DATA_DIR` if needed.
+Override both roots together with the `LINUXDEVSTACKBOX_DATA_DIR` environment variable if needed (see [Environment](../advanced/environment)).
 
-Runtime configs live under the user data root. Apache serves localhost from the install folder’s `www` and connected projects from their selected document roots. MySQL data remains under the user data root. `DEVSTACKBOX_DATA_DIR` does not relocate `www` or external project files.
+Apache serves localhost from the data root's `www` and connected projects from their selected document roots. On first run the app clones the read-only phpMyAdmin payload from `/usr/lib/linuxdevstackbox/phpmyadmin` into the data root, because `config.inc.php` must be writable.
 
 ## Update check (shipped)
 
-The app includes `tauri-plugin-updater` and an **Auto-check updates** preference (Settings → Updates). When enabled:
+The app checks GitHub Releases for new versions (an **Auto-check updates** preference exists under Settings → Updates):
 
-- Checks GitHub Releases on launch and every 6 hours
-- Shows a header indicator when a newer version exists
-- Manual **Check for updates** on the About page always available
+- Checks on launch and on a bounded interval; a header indicator appears when a newer version exists
+- Manual **Check for updates** on the About page is always available
 
-When a newer semver is published, the About page and header guide the user through **download and install**: the signed NSIS package is fetched from the URL in `latest.json`, verified with the minisign public key in `tauri.conf.json`, executed, then the app relaunches. See [Upgrading](../getting-started/upgrading).
+The updater is **check-only**: when a newer version is detected, the app opens the GitHub release page and instructs the user to upgrade through their package manager (`apt`, `dnf`/`yum`, or `pacman`). Tauri self-update only supports AppImage, which is not a deliverable, so the app never downloads or replaces itself.
 
-**Stable updater endpoint** (also used by `check_app_update` for the stable channel):
+**Update check endpoint** (used by `check_app_update`):
 
-`https://github.com/DevStackBox/DevStackBox/releases/latest/download/latest.json`
+`https://github.com/mamsm-dev/LinuxDevStackBox/releases/latest/download/latest.json`
 
-## Auto-update hardening (Phase 4.3 - in progress)
-
-Download, signature verification, and in-app install are **shipped** as of v0.1.8+. Remaining safety work:
-
-- [x] Runtime configs, logs, and database data outside the install directory
-- [x] Updater plugin wired in the app
-- [x] Updater endpoint and signing public key in `tauri.conf.json`
-- [ ] Pre-update service shutdown (Apache + MySQL) before the installer runs
-- [x] Configuration backups and version migrations exist; v0.1.17 adds a separate syntax-checked Apache override migration. See the configuration reference for preservation limits.
-- [ ] Documented end-to-end test: install v0.X.Y → update to v0.X.Y+1 with data intact
-
-Target milestone for the remaining items: **v0.2.0** ([Roadmap](../roadmap)). Publishing steps are in [Release process](../development/release-process).
+Publishing steps, including publishing `latest.json` with a release, are in [Release process](../development/release-process).
 
 ## Uninstall
 
-Use **Settings → Apps → Installed apps** in Windows. Uninstall options can preserve `%LOCALAPPDATA%\DevStackBox\` for runtime data. Back up the install folder’s `www` separately and read the uninstaller options before proceeding.
-
-## Related
-
-- [Installation](../getting-started/installation)
-- [Upgrading](../getting-started/upgrading)
-- [Configuration](configuration) - ports and config paths
-- [Release process](../development/release-process)
+Remove the package with your package manager (`apt remove`, `dnf remove`, or `pacman -R`). Package removal never deletes the XDG config and data roots; remove them manually if you do not want to keep projects, databases, logs and configuration for a future reinstall.

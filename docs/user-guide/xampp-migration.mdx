@@ -5,14 +5,14 @@ description: "Keep existing project folders or copy htdocs and migrate databases
 
 # Connect or import XAMPP projects
 
-You can use an existing project folder with DevStackBox without moving it. Importing files is an alternative, not a requirement.
+You can use an existing project folder with LinuxDevStackBox without moving it. Importing files is an alternative, not a requirement.
 
 ## Connect in place
 
 1. Back up the project and export its database using the current working environment.
 2. Open **Projects → Add project / site** and select the existing folder.
 3. Choose a unique hostname and the actual document root; Laravel should serve its `public` folder.
-4. Configure the application's database connection for DevStackBox separately and test the website.
+4. Configure the application's database connection for LinuxDevStackBox separately and test the website.
 
 Connecting does not install dependencies or copy databases. Full backups exclude project files outside the default www folder, so retain a separate file backup.
 
