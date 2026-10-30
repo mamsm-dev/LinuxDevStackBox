@@ -1,43 +1,52 @@
 ---
 title: "Release Process"
-description: "Acceptance gates for the v0.1.22 release."
+description: "How LinuxDevStackBox releases are built, validated and published automatically."
 icon: "Rocket"
 ---
-# v0.1.22 release process
+# Release process
 
-The source version is 0.1.22. Package generation, installed qualification and publication are separate steps. [Release runbook](./release-runbook) contains the exact commands.
+Releases are automated. Pushing a version tag `v<major>.<minor>.<patch>` (for example `v1.0.0`) triggers GitHub Actions, which builds the Arch, Debian and Fedora packages in their native environments, validates them, and publishes a GitHub Release with all three packages and a `SHA256SUMS` file. The exact commands are in the [release runbook](./release-runbook).
 
-## 1. Review source and versions
+## Supported distributions and package formats
 
-- Review the app and website changes and the changelog.
-- Match package.json, src-tauri/Cargo.toml and src-tauri/tauri.conf.json at 0.1.22; synchronize app entries in both lockfiles (package-lock.json and Cargo.lock).
-- Run npm run check, `npm run test:packaging`, Rust unit tests and both Apache regression modes.
-- Preserve historical release notes and hashes. Generated download manifests stay associated with their original assets until finalization.
+| Distribution family | Package | Built in |
+| ------------------- | ------- | -------- |
+| Arch Linux and derivatives | `.pkg.tar.zst` (from [packaging/arch/PKGBUILD](https://github.com/mamsm-dev/LinuxDevStackBox/blob/main/packaging/arch/PKGBUILD)) | `archlinux:base-devel` container with `makepkg` |
+| Debian and derivatives | `.deb` (from [packaging/debian](https://github.com/mamsm-dev/LinuxDevStackBox/blob/main/packaging/debian/control)) | Ubuntu 24.04 runner with `dpkg-buildpackage` |
+| Fedora and RPM derivatives | `.rpm` (from [packaging/fedora/linuxdevstackbox.spec](https://github.com/mamsm-dev/LinuxDevStackBox/blob/main/packaging/fedora/linuxdevstackbox.spec)) | `fedora:latest` container with `rpmbuild` |
 
-## 2. Build the packages
+No other formats (AppImage, Snap, Flatpak) are produced. Windows is not supported.
 
-Build the `.deb` and `.rpm` bundles with `npx tauri build --bundles deb rpm` as described in the runbook (the bundle targets are configured in src-tauri/tauri.conf.json). The Arch package is built separately from `packaging/arch/PKGBUILD` with `makepkg -f`. There is no code-signing step; never bypass a failed integrity or checksum check.
+## Pipeline overview
 
-## 3. Finalize from the exact artifact
+Three workflows live in `.github/workflows/`:
 
-Confirm the published packages and release metadata all describe the same bytes: same version, matching checksums, release notes and changelog hash. Do not use a previous build's checksum or invent a download URL for an unavailable release.
+- **`ci.yml`** — runs on every push to `main` and every pull request: frontend build and tests, Rust tests and clippy, packaging metadata consistency, Debian changelog/control parsing, RPM spec parsing and PKGBUILD source-info generation. It never publishes anything.
+- **`build-packages.yml`** — a reusable workflow that builds one package per job in the matching environment (Arch container, Ubuntu runner, Fedora container), runs makepkg/dpkg-buildpackage/rpmbuild as the intended non-root build flow, validates the produced package metadata (`pacman -Qip`, `dpkg-deb --info` + lintian, `rpm -qip`), and uploads one artifact per format.
+- **`release.yml`** — triggered only by pushing a `v*` tag. It validates the tag against every project manifest, calls the build workflow, downloads the three artifacts, verifies exactly one package per format is present and that every file name carries the released version, generates `SHA256SUMS`, and creates the GitHub Release with GitHub-generated notes. Only this job has `contents: write`; every build job is read-only.
 
-## 4. Qualify on Linux
+## Version consistency
 
-- Test a fresh install and an upgrade on a clean environment for each supported distro family (Arch, Debian, Fedora), with project/database backups.
+The Git tag is the release version source. `scripts/verify-packaging-metadata.mjs` compares the application version across `package.json`, `src-tauri/tauri.conf.json`, `src-tauri/Cargo.toml`, `src-tauri/Cargo.lock`, `packaging/arch/PKGBUILD`, `packaging/debian/changelog` and `packaging/fedora/linuxdevstackbox.spec`, and — when a tag is given — fails unless the tag matches. The version is bumped deliberately in all those files in a single commit before tagging; CI fails early if they drift.
+
+## Package validation levels
+
+The pipeline distinguishes explicitly:
+
+- **Package build validation** — makepkg/dpkg-buildpackage/rpmbuild must succeed (this happens in every build job and release run).
+- **Package metadata validation** — `pacman -Qip/-Qlp`, `dpkg-deb --info/--contents` + lintian, `rpm -qip/-qpl/--requires` run against the built packages inside the same job.
+- **Installation testing** — installing the packages in real Arch/Debian/Fedora environments. The workflows verify archives and metadata; they do not install the packages. Run a manual install test per family before or after a release where possible, and record results in [docs/RELEASE-VALIDATION.md](https://github.com/mamsm-dev/LinuxDevStackBox/blob/main/docs/RELEASE-VALIDATION.md).
+- **Application runtime testing** — starting services, serving PHP, database operations. Never covered by the pipeline automatically; follow [Testing](./testing) and the qualification gates below.
+
+## Qualification gates (unchanged)
+
+Automated publication removes the build step from the manual runbook, not the acceptance gates:
+
+- Test a fresh install and an upgrade in a clean environment for each supported distro family where possible, with project/database backups.
 - Verify custom ports, user PHP settings, site records and database contents survive.
-- Verify the Apache migration creates its backup and does not duplicate the baseline after restart.
-- Verify Laravel public-directory routes, static assets, HTTP and HTTPS, and a project with parent .htaccess. Check that private parent files remain inaccessible.
-- Verify plain PHP and a root-level rewrite project; the distro PHP version is respected (minimum 8.2).
-- Compare the displayed log path with the running server configuration and confirm a fresh request is observable.
-- Check localhost, phpMyAdmin, large SQL restore failure reporting and the update check.
+- Verify the first-launch flow: XDG data roots are created, phpMyAdmin is cloned into the data root, and the only elevated prompts are the two `pkexec` operations.
+- Record actual results and remaining limitations; never label unperformed tests as passed.
 
-Record actual results and remaining limitations in docs/RELEASE-VALIDATION.md. Do not label unperformed tests as passed. [Testing](./testing) provides details.
+## Website
 
-## 5. Publish and verify
-
-Commit reviewed source, create the v0.1.22 tag, and upload the `.deb`, `.rpm` and Arch package plus release notes to GitHub Releases. Publish `latest.json` on the release so the in-app update check can detect the new version: the updater is check-only, so on update availability the app opens the release page and instructs the user to upgrade through their package manager (Tauri self-update only supports AppImage, which is not a deliverable). Verify remote assets match the local artifacts and their checksums.
-
-## 6. Website
-
-Commit the source docs before hosted website builds. Pin the app-doc source ref to v0.1.22 or the exact reviewed commit. Run content preparation, website tests, lint, build and HTTP smoke checks. Publish only after download assets are available; release availability is read from GitHub, not inferred from source version. Use approved native-resolution screenshots matching the documentation baseline. Keep capture provenance distinct from release availability.
+Hosted website builds remain a separate, manual step. Pin the app-doc source ref to the exact reviewed commit and publish only after the GitHub Release assets are available; release availability is read from GitHub, not inferred from the source version.

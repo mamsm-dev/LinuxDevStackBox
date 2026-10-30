@@ -24,7 +24,7 @@ cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets -- -D warnings
 - `test:packaging` runs `node --test scripts/stage-phpmyadmin.check.mjs` against the staged phpMyAdmin payload.
 - `cargo test --lib` runs the Rust unit tests (59 tests). Clippy must stay clean with `-D warnings`.
 
-CI (`.github/workflows/check.yml`) runs `npm ci`, `npm run check:ci`, `npm run build`, `cargo test --lib` and `cargo clippy -D warnings` on ubuntu-latest.
+CI (`.github/workflows/ci.yml`) runs `npm ci`, `npm run check:ci`, `npm run build`, `cargo test --lib` and `cargo clippy -D warnings` on ubuntu-latest.
 
 ## Apache override regression
 
