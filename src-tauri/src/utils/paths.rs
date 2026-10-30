@@ -46,6 +46,9 @@ pub fn get_installation_path() -> PathBuf {
         let mut candidates = vec![
             exe_dir.clone(),
             PathBuf::from("/usr/lib").join(APP_ID),
+            // The Tauri deb bundle derives its resource directory from the
+            // product name, so accept the capitalized layout too.
+            PathBuf::from("/usr/lib/LinuxDevStackBox"),
             exe_dir
                 .parent()
                 .map(|p| p.join("lib").join(APP_ID))

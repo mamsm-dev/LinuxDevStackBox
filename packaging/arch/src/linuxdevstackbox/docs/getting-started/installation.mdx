@@ -1,0 +1,50 @@
+---
+title: "Installation"
+description: "Install DevStackBox on Windows 10 or 11."
+icon: "Download"
+since: "0.1.6"
+---
+
+# Install DevStackBox
+
+DevStackBox ships as a Windows NSIS installer. Administrator rights are required because the default install location is `C:\devstackbox`.
+
+## Download
+
+Get the latest **Windows x64 installer** from:
+
+- [devstackbox.com/download](https://www.devstackbox.com/download)
+- [GitHub Releases](https://github.com/DevStackBox/DevStackBox/releases/latest)
+
+## What the installer includes
+
+| Component | Version |
+| --------- | ------- |
+| PHP | 8.3 (default runtime) |
+| Apache | 2.4 |
+| MySQL | 8.4 LTS |
+| phpMyAdmin | 5.2 |
+
+Additional PHP branches (8.2, 8.4, 8.5) are downloaded from the app after install.
+
+## Install
+
+1. Run the `.exe` installer (accept the UAC prompt when asked).
+2. Choose the install directory if prompted (default: `C:\devstackbox`).
+3. Launch DevStackBox from the Start Menu or desktop shortcut.
+4. Open the app and start Apache and MySQL when you need them.
+5. Open [http://localhost/phpmyadmin](http://localhost/phpmyadmin) to confirm the stack works.
+
+## Auto-updates
+
+DevStackBox checks for updates and can install them in place. See [Upgrading](upgrading) for what happens during an upgrade.
+
+## Uninstall
+
+Use Windows **Settings → Apps → Installed apps**, find DevStackBox, and uninstall. Your sites under `www` and data under `%LOCALAPPDATA%\devstackbox` are preserved according to the uninstaller options.
+
+## Next steps
+
+- [Upgrading](upgrading) - in-place updates and `www` preservation
+- [Troubleshooting](../advanced/troubleshooting) - if services fail to start
+- [Roadmap](../roadmap) - planned features

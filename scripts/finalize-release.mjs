@@ -1,55 +1,41 @@
+#!/usr/bin/env node
 /**
- * Finalize release metadata from CHANGELOG + installer bytes.
+ * Finalizes release metadata: hashes the built Linux packages, injects the
+ * SHA-256 lines into the matching CHANGELOG section and writes release notes.
  *
  * Usage:
  *   node scripts/finalize-release.mjs [--write-changelog] [--notes-only]
- *   node scripts/finalize-release.mjs --verify-github v0.1.12
- *   node scripts/finalize-release.mjs --from-github v0.1.12 [--write-changelog]
- *
- * Env:
- *   RELEASE_INSTALLER_PATH - override NSIS path (default: bundle/nsis/DevStackBox_{version}_x64-setup.exe)
  */
 
 import { createHash } from "node:crypto";
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { spawnSync } from "node:child_process";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
-const tauriConf = JSON.parse(
-  readFileSync(join(root, "src-tauri/tauri.conf.json"), "utf8"),
-);
+const tauriConf = JSON.parse(readFileSync(join(root, "src-tauri/tauri.conf.json"), "utf8"));
 const version = tauriConf.version;
 const changelogPath = join(root, "CHANGELOG.md");
-const SHA_LINE = /^\*\*Installer SHA-256:\*\* `[0-9A-Fa-f]{64}`\s*$/m;
+const SHA_LINE = /^\*\*Package SHA-256:\*\* `[0-9A-Fa-f]{64}`\s*$/m;
 
-function defaultInstallerPath() {
-  return join(
-    root,
-    "src-tauri/target/release/bundle/nsis",
-    `DevStackBox_${version}_x64-setup.exe`,
-  );
+function artifactPaths() {
+  const base = join(root, "src-tauri/target/release/bundle");
+  return [
+    join(base, "deb", `LinuxDevStackBox_${version}_amd64.deb`),
+    join(base, "rpm", `LinuxDevStackBox-${version}-1.x86_64.rpm`),
+  ];
 }
 
 function hashFile(path) {
-  const buf = readFileSync(path);
-  return createHash("sha256").update(buf).digest("hex").toUpperCase();
+  return createHash("sha256").update(readFileSync(path)).digest("hex").toUpperCase();
 }
 
 function parseArgs(argv) {
-  const out = {
-    writeChangelog: false,
-    notesOnly: false,
-    verifyGithub: null,
-    fromGithub: null,
-  };
+  const out = { writeChangelog: false, notesOnly: false };
   for (let i = 2; i < argv.length; i++) {
     const a = argv[i];
     if (a === "--write-changelog") out.writeChangelog = true;
     else if (a === "--notes-only") out.notesOnly = true;
-    else if (a === "--verify-github") out.verifyGithub = argv[++i];
-    else if (a === "--from-github") out.fromGithub = argv[++i];
     else throw new Error(`Unknown argument: ${a}`);
   }
   return out;
@@ -58,9 +44,7 @@ function parseArgs(argv) {
 function extractSection(changelog, ver) {
   const header = `## [${ver}]`;
   const start = changelog.indexOf(header);
-  if (start === -1) {
-    throw new Error(`CHANGELOG missing section ${header}`);
-  }
+  if (start === -1) throw new Error(`CHANGELOG missing section ${header}`);
   const afterHeader = changelog.indexOf("\n", start) + 1;
   const next = changelog.indexOf("\n## [", afterHeader);
   const body = changelog.slice(afterHeader, next === -1 ? undefined : next);
@@ -74,139 +58,45 @@ function stripShaFromSection(section) {
   return section.replace(SHA_LINE, "").trimEnd();
 }
 
-function injectSha(section, sha) {
+function injectSha(section, shas) {
   const base = stripShaFromSection(section);
-  return `${base}\n\n**Installer SHA-256:** \`${sha}\``;
+  const lines = shas.map(([name, sha]) => `- **${name} SHA-256:** \`${sha}\``);
+  return `${base}\n\n**Package SHA-256:**\n\n${lines.join("\n")}`;
 }
 
-function sectionToReleaseNotes(section, tag, sha) {
-  const cleaned = stripShaFromSection(section);
-  const prev = version.replace(/\d+$/, (n) => String(Number(n) - 1));
-  const prevTag = `v${prev}`;
-  let md = `DevStackBox **${tag}**.\n\n`;
-  md += cleaned;
-  md += `\n\n**Installer SHA-256:** \`${sha}\``;
-  md += `\n\nIn-app auto-update from **${prevTag}** uses the updater-signed installer and \`latest.json\` on this release.`;
-  return md.trim() + "\n";
-}
+const args = parseArgs(process.argv);
+const section = extractSection(readFileSync(changelogPath, "utf8"), version);
 
-function ghApi(path) {
-  const r = spawnSync("gh", ["api", path, "--jq", ".assets"], {
-    encoding: "utf8",
-    cwd: root,
-  });
-  if (r.status !== 0) {
-    throw new Error(r.stderr || r.stdout || "gh api failed");
-  }
-  return JSON.parse(r.stdout);
+const artifacts = artifactPaths().filter((p) => existsSync(p));
+if (!artifacts.length) {
+  console.error("No built packages found. Run scripts/build-release.mjs first.");
+  process.exit(1);
 }
+const hashes = artifacts.map((p) => [path.basename(p), hashFile(p)]);
 
-function digestFromGithub(tag) {
-  const assets = ghApi(`repos/DevStackBox/DevStackBox/releases/tags/${tag}`);
-  const exe = assets.find(
-    (a) =>
-      /setup\.exe$/i.test(a.name) &&
-      new RegExp(`DevStackBox_${version}_`, "i").test(a.name),
-  );
-  if (!exe?.digest) {
-    throw new Error(`No setup.exe digest on GitHub for ${tag}`);
-  }
-  const m = exe.digest.match(/^sha256:([a-f0-9]{64})$/i);
-  if (!m) throw new Error(`Unexpected digest format: ${exe.digest}`);
-  return m[1].toUpperCase();
+const notes = injectSha(section, hashes);
+if (!args.notesOnly) {
+  console.log(`Release ${version} finalized\n`);
+  for (const [name, sha] of hashes) console.log(`${name}\n  SHA-256: ${sha}`);
 }
-
-function updateChangelogSha(sha) {
-  let cl = readFileSync(changelogPath, "utf8");
-  const section = extractSection(cl, version);
-  const nextSection = injectSha(section, sha);
-  const header = `## [${version}]`;
-  const start = cl.indexOf(header);
-  const afterHeader = cl.indexOf("\n", start) + 1;
-  const next = cl.indexOf("\n## [", afterHeader);
-  const before = cl.slice(0, afterHeader);
-  const after = next === -1 ? "" : cl.slice(next);
-  cl = before + nextSection + "\n" + after;
-  writeFileSync(changelogPath, cl, "utf8");
-}
-
-function writeNotes(notes) {
-  const dir = join(root, "release");
-  mkdirSync(dir, { recursive: true });
-  const path = join(dir, `notes-v${version}.md`);
-  writeFileSync(path, notes, "utf8");
-  return path;
-}
-
-function main() {
-  const args = parseArgs(process.argv);
-  const tag = `v${version}`;
+if (args.writeChangelog) {
   const changelog = readFileSync(changelogPath, "utf8");
-  const section = extractSection(changelog, version);
-
-  let sha;
-  if (args.fromGithub || args.verifyGithub) {
-    const t = args.fromGithub || args.verifyGithub;
-    sha = digestFromGithub(t);
-  } else {
-    const installer =
-      process.env.RELEASE_INSTALLER_PATH?.trim() || defaultInstallerPath();
-    if (!existsSync(installer)) {
-      throw new Error(
-        `Installer not found: ${installer}. Build first or set RELEASE_INSTALLER_PATH.`,
-      );
-    }
-    sha = hashFile(installer);
-  }
-
-  if (args.verifyGithub) {
-    const installer =
-      process.env.RELEASE_INSTALLER_PATH?.trim() || defaultInstallerPath();
-    if (existsSync(installer)) {
-      const local = hashFile(installer);
-      if (local !== sha) {
-        throw new Error(
-          `GitHub digest ${sha} does not match local file ${local}`,
-        );
-      }
-    }
-    console.log(`OK: GitHub asset digest matches (${sha})`);
-    return;
-  }
-
-  const notes = sectionToReleaseNotes(section, tag, sha);
-  const notesPath = writeNotes(notes);
-  console.log(`Wrote ${notesPath}`);
-  console.log(`SHA-256: ${sha}`);
-
-  if (args.writeChangelog && !args.notesOnly) {
-    const installer = process.env.RELEASE_INSTALLER_PATH?.trim() || defaultInstallerPath();
-    const verification = spawnSync(process.execPath, [join(root, "scripts/verify-updater-artifact.mjs"), installer], { cwd: root, stdio: "inherit", windowsHide: true });
-    if (verification.status !== 0) throw new Error("Release metadata requires a valid signature for the exact installer.");
-    updateChangelogSha(sha);
-    console.log(`Updated CHANGELOG.md [${version}] SHA line`);
-    // Packaging metadata must refer to these exact installer bytes, never an old hash.
-    const wingetPath = join(root, "packaging/winget/DevStackBox.DevStackBox.yaml");
-    const installerName = `DevStackBox_${version}_x64-setup.exe`;
-    let winget = readFileSync(wingetPath, "utf8")
-      .replace(/^PackageVersion:.*$/m, `PackageVersion: ${version}`)
-      .replace(/^    InstallerUrl:.*$/m, `    InstallerUrl: https://github.com/DevStackBox/DevStackBox/releases/download/v${version}/${installerName}`)
-      .replace(/^    InstallerSha256:.*$/m, `    InstallerSha256: ${sha}`);
-    writeFileSync(wingetPath, winget);
-    const nuspecPath = join(root, "packaging/chocolatey/devstackbox.nuspec");
-    writeFileSync(nuspecPath, readFileSync(nuspecPath, "utf8").replace(/<version>[^<]+<\/version>/, `<version>${version}</version>`));
-    const manifest = {
-      version, notes: stripShaFromSection(section).trim(), pub_date: new Date().toISOString(),
-      platforms: { "windows-x86_64": {
-        signature: readFileSync(`${process.env.RELEASE_INSTALLER_PATH?.trim() || defaultInstallerPath()}.sig`, "utf8").trim(),
-        url: `https://github.com/DevStackBox/DevStackBox/releases/download/v${version}/${installerName}`,
-      } },
-    };
-    for (const destination of [join(root, "latest.json"), join(root, "release/latest.json")]) {
-      writeFileSync(destination, JSON.stringify(manifest, null, 2) + "\n");
-    }
-    console.log("Updated package manifests and latest.json from the final installer/signature.");
-  }
+  const header = `## [${version}]`;
+  const start = changelog.indexOf(header);
+  const next = changelog.indexOf("\n## [", start + header.length);
+  const updated =
+    changelog.slice(0, start) +
+    header + "\n\n" + notes + "\n" +
+    (next === -1 ? "" : changelog.slice(next));
+  writeFileSync(changelogPath, updated);
+  console.log("CHANGELOG.md updated with package hashes.");
 }
 
-main();
+// Updater manifest consumed by the in-app release check.
+const latest = {
+  version,
+  notes: stripShaFromSection(section),
+  pub_date: new Date().toISOString(),
+};
+writeFileSync(join(root, "latest.json"), JSON.stringify(latest, null, 2) + "\n");
+console.log("latest.json written for the in-app release check.");

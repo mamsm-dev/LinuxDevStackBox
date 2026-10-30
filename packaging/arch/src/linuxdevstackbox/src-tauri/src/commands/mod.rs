@@ -1,0 +1,23 @@
+// Tauri command modules.
+// Roadmap Phase 2: extracted from monolithic lib.rs.
+
+pub mod apache;
+pub mod app_update;
+pub mod config;
+pub mod fullbackup;
+pub mod logs;
+pub mod log_management;
+pub mod migration;
+pub mod mysql;
+pub mod mysql_import;
+pub mod php;
+pub mod security;
+pub mod ssl;
+pub mod system;
+pub mod terminal;
+pub mod tray;
+pub mod vhosts;
+
+pub mod projects;
+
+pub mod database_workspace;

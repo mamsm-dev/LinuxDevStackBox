@@ -1,0 +1,70 @@
+# Maintainer: MAM <mamsm-dev@users.noreply.github.com>
+# Arch Linux package for the LinuxDevStackBox desktop application.
+#
+# Build from the repository root:
+#   git archive --prefix=linuxdevstackbox/ -o linuxdevstackbox-0.1.22.tar.gz HEAD
+#   cd packaging/arch && makepkg -f
+#
+# The application manages Apache, MariaDB and PHP from distribution packages,
+# which are hard runtime dependencies. phpMyAdmin ships inside the package.
+
+pkgname=linuxdevstackbox
+pkgver=0.1.22
+pkgrel=1
+pkgdesc="Local PHP development environment for Linux: Apache, MariaDB, PHP and phpMyAdmin with per-user configuration"
+arch=('x86_64')
+url="https://github.com/mamsm-dev/LinuxDevStackBox"
+license=('MIT')
+depends=(
+  'apache'
+  'mariadb'
+  'mariadb-clients'
+  'php'
+  'php-cgi'
+  'openssl'
+)
+optdepends=('polkit: permission prompts for /etc/hosts and CA trust store changes')
+makedepends=('nodejs' 'npm' 'rust' 'webkit2gtk-4.1' 'base-devel' 'git')
+conflicts=('linuxdevstackbox-git')
+source=("$pkgname-$pkgver.tar.gz")
+sha256sums=('SKIP')
+options=('!strip')
+
+build() {
+  cd "$srcdir/$pkgname"
+
+  export npm_config_build_from_source=true
+
+  msg2 "Building the frontend"
+  npm ci --no-audit --no-fund
+  npm run prebuild
+  npm run build
+
+  msg2 "Building the application"
+  cd src-tauri
+  cargo build --release --frozen
+}
+
+package() {
+  cd "$srcdir/$pkgname"
+
+  msg2 "Installing binary"
+  install -Dm755 src-tauri/target/release/linuxdevstackbox "$pkgdir/usr/bin/linuxdevstackbox"
+
+  msg2 "Installing phpMyAdmin runtime"
+  install -d "$pkgdir/usr/lib/$pkgname/phpmyadmin"
+  cp -a packaging/phpmyadmin-runtime/. "$pkgdir/usr/lib/$pkgname/phpmyadmin/"
+
+  msg2 "Installing desktop entry"
+  install -Dm644 packaging/arch/linuxdevstackbox.desktop \
+    "$pkgdir/usr/share/applications/com.mam.linuxdevstackbox.desktop"
+
+  msg2 "Installing icons"
+  for size in 32x32 64x64 128x128; do
+    install -Dm644 "src-tauri/icons/${size}.png" \
+      "$pkgdir/usr/share/icons/hicolor/${size}/apps/$pkgname.png"
+  done
+
+  msg2 "Installing license"
+  install -Dm644 LICENSE "$pkgdir/usr/share/licenses/$pkgname/LICENSE"
+}

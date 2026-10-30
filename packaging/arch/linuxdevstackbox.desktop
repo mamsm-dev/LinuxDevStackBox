@@ -1,0 +1,12 @@
+[Desktop Entry]
+Type=Application
+Version=1.0
+Name=LinuxDevStackBox
+GenericName=Local PHP Development Environment
+Comment=Manage Apache, MariaDB, PHP and phpMyAdmin for local development
+Exec=linuxdevstackbox
+Icon=linuxdevstackbox
+Terminal=false
+Categories=Development;WebDevelopment;
+Keywords=php;apache;mysql;mariadb;devserver;localhost;
+StartupWMClass=LinuxDevStackBox

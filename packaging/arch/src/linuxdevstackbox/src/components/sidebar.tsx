@@ -1,0 +1,132 @@
+import { motion } from "framer-motion";
+import { NavLink } from "react-router-dom";
+import { ChevronLeft, ChevronRight, Heart } from "lucide-react";
+import { openExternalUrl } from "@/lib/tauri";
+import { useTranslation } from "react-i18next";
+import { AppLogo } from "@/components/app-logo";
+import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
+import { APP_VERSION } from "@/lib/version";
+import { SIDEBAR_ROUTES } from "@/lib/routes";
+
+interface SidebarProps {
+  collapsed: boolean;
+  onToggleCollapse: () => void;
+  onNavigate?: () => void;
+}
+
+export function Sidebar({
+  collapsed,
+  onToggleCollapse,
+  onNavigate,
+}: SidebarProps) {
+  const { t } = useTranslation();
+
+  return (
+    <motion.div
+      initial={{ x: -100 }}
+      animate={{ x: 0, width: collapsed ? 60 : 240 }}
+      transition={{ duration: 0.3 }}
+      className="fixed left-0 top-0 h-full bg-card border-r border-border z-50 flex flex-col md:z-50"
+    >
+      <div className="p-4 border-b border-border flex items-center justify-between">
+        {collapsed ? (
+          <div className="flex w-full flex-col items-center gap-2">
+            <AppLogo className="h-7 w-7" />
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={onToggleCollapse}
+              className="h-8 w-8"
+            >
+              <ChevronRight className="h-4 w-4" />
+            </Button>
+          </div>
+        ) : (
+          <>
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ delay: 0.2 }}
+              className="flex items-center space-x-2 min-w-0"
+            >
+              <AppLogo />
+              <div className="min-w-0">
+                <h2 className="font-semibold text-sm truncate">LinuxDevStackBox</h2>
+                <p className="text-xs text-muted-foreground">v{APP_VERSION}</p>
+              </div>
+            </motion.div>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={onToggleCollapse}
+              className="h-8 w-8 shrink-0"
+            >
+              <ChevronLeft className="h-4 w-4" />
+            </Button>
+          </>
+        )}
+      </div>
+
+      <nav className="flex-1 p-4 space-y-2">
+        {SIDEBAR_ROUTES.map((route) => {
+          const Icon = route.icon;
+          const label = t(route.labelKey, route.defaultLabel);
+          return (
+            <motion.div
+              key={route.path}
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
+            >
+              <NavLink
+                to={route.path}
+                end={route.path === "/"}
+                onClick={() => onNavigate?.()}
+                className={({ isActive }) =>
+                  cn(
+                    "flex items-center w-full rounded-md text-sm font-medium transition-colors",
+                    collapsed
+                      ? "h-10 w-10 justify-center"
+                      : "h-10 px-3 justify-start",
+                    isActive
+                      ? "bg-primary text-primary-foreground"
+                      : "text-foreground hover:bg-accent hover:text-accent-foreground",
+                  )
+                }
+              >
+                <Icon className={cn("h-4 w-4", !collapsed && "mr-2")} />
+                {!collapsed && (
+                  <motion.span
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    transition={{ delay: 0.1 }}
+                  >
+                    {label}
+                  </motion.span>
+                )}
+              </NavLink>
+            </motion.div>
+          );
+        })}
+      </nav>
+
+      <div className="p-4 border-t border-border">
+        {!collapsed && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.2 }}
+            className="text-xs text-muted-foreground text-center"
+          >
+            <a href="https://www.nomadprogrammer.in/" onClick={(event) => { event.preventDefault(); void openExternalUrl("https://www.nomadprogrammer.in/"); }} className="inline-flex items-center gap-1.5 hover:text-foreground">
+              {t("sidebar.builtWithLove", "Built with Love")}
+              <Heart aria-hidden="true" className="h-3.5 w-3.5 fill-red-500 text-red-500" />
+            </a>
+          </motion.div>
+        )}
+      </div>
+    </motion.div>
+  );
+}
+
+export default Sidebar;

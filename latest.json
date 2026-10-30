@@ -1,0 +1,5 @@
+{
+  "version": "0.1.22",
+  "notes": "LinuxDevStackBox 0.1.22 - first Linux-only release: distribution-managed Apache, MariaDB/MySQL and PHP, per-user XDG configuration, trusted local HTTPS via the system trust store, .deb, .rpm and Arch packages.",
+  "pub_date": "2026-10-30T00:00:00Z"
+}

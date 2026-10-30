@@ -1,0 +1,53 @@
+---
+title: "Testing"
+description: "Automated checks and Windows release validation."
+icon: "TestTube"
+---
+# Testing DevStackBox
+
+Automated checks cover parts of the frontend and Rust backend. They do not replace testing the bundled services and installer on Windows.
+
+## Automated checks
+
+From the repository root, run:
+
+```bash
+pnpm test
+pnpm check:ci
+cargo test --manifest-path src-tauri/Cargo.toml --lib
+```
+
+`pnpm test` runs Vitest. `check:ci` also checks TypeScript and documentation. Rust tests require the Windows build prerequisites described in [Development setup](./building.mdx).
+
+## Apache override regression
+
+Run `node scripts/test-apache-overrides.mjs --legacy` to reproduce the original parent .htaccess error and `node scripts/test-apache-overrides.mjs` to verify the fix. Alternatively run `scripts/test-config.ps1`. These tests use disposable files and a loopback-only Apache instance, covering a path with spaces, public rewrites, static files and inaccessible private parent files. They do not restart the installed server. Temporary fixture paths are printed for inspection.
+
+## Release checklist
+
+Use a clean Windows test environment and the installer actually attached to the release. The primary installer is NSIS (`.exe`); MSI is not a current release target.
+
+- Verify the downloaded installer against its published checksum, where provided.
+- Test first installation, launch, Start Menu entries, and the default and custom installation paths.
+- Test an upgrade with backed-up projects and databases. Verify projects, configuration, and database contents survive.
+- Start and stop Apache and MySQL; verify localhost and phpMyAdmin respond while running.
+- Check PHP versions, switching, downloads, and terminal output.
+- Test configuration editing, backups, and restoration.
+- Import an XAMPP `htdocs` folder; confirm duplicate path spellings appear only once, existing destination files remain intact, and copied files load.
+- Export and import databases separately; the XAMPP import action copies project files only.
+- Exercise occupied ports and missing binaries; errors should be actionable without crashing.
+- Check English and Hindi, both themes, keyboard navigation, and persistence after restart.
+- Check uninstall behavior in a disposable environment, including any data-preservation choices.
+
+## Paths to verify
+
+| Environment | Example | Verify |
+| --- | --- | --- |
+| Default installation | `C:\devstackbox` | Bundled services and `www` projects resolve |
+| Custom installation | `D:\DevStackBox` | Services, projects, and paths with spaces work |
+| Development checkout | `D:\Projects\DevStackBox` | Development resource paths resolve |
+| User data | `%LOCALAPPDATA%\DevStackBox` | Config, logs, backups, and MySQL data remain separate |
+
+## Remaining coverage
+
+Manual verification is still required for real service processes, installer upgrades, long-running resource use, simultaneous operations, and supported Windows versions. Add a regression test when practical and retain a manual reproduction for behavior that depends on the installed environment.

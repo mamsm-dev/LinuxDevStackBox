@@ -1,0 +1,112 @@
+---
+title: "006 - App and data separation"
+description: "Architecture decision record."
+icon: "FileQuestion"
+---
+# ADR 006: App/Data Directory Separation
+
+**Status:** Accepted with subsequent implementation changes
+**Date:** May 2026  
+**Deciders:** Project maintainer
+
+---
+
+## Current implementation note
+
+This record preserves the original proposal. The current `user_www_dir()` keeps projects under the install directory’s `www` (default `C:\devstackbox\www`). Runtime configs, logs, MySQL data, and backups use `%LOCALAPPDATA%\devstackbox`. The proposed project relocation below is not the current path contract. See [Installer & updates](../../reference/installer).
+
+## Context
+
+DevStackBox bundles Apache, PHP, MySQL, and phpMyAdmin binaries alongside user data (web projects, databases, configs, logs) in a single directory. This was acceptable for early development but creates a critical problem when auto-updates are introduced.
+
+If the updater replaces files in the installation directory, it risks overwriting:
+
+- MySQL `data/` - destroying all user databases permanently
+- Runtime config files - resetting all user customizations
+- User web projects in `www/` - destroying active project files
+
+This has caused catastrophic data loss in similar tools (early WAMP, older MAMP versions, some XAMPP configurations).
+
+---
+
+## Decision
+
+Separate all application files from all user data files into two distinct directory roots with different replacement policies.
+
+**App Root** (replaceable by updater):
+
+```
+C:\Program Files\DevStackBox\
+  DevStackBox.exe
+  apache/
+  php/
+  phpmyadmin/
+  resources/
+```
+
+**User Data Root** (never touched by updater):
+
+```
+%LOCALAPPDATA%\DevStackBox\
+  www/
+  mysql-data/
+  logs/
+  config/
+  config-backups/
+  certs/
+  backups/
+```
+
+The user data path defaults to `%LOCALAPPDATA%\DevStackBox\` and can be overridden with the `DEVSTACKBOX_DATA_DIR` environment variable.
+
+---
+
+## Alternatives Considered
+
+### 1. Keep everything in one directory, use file exclusion in the updater
+
+**Rejected.** Exclusion lists are fragile. Any new file added to the app that happens to overlap with a user data path could be excluded from updates incorrectly. The Tauri updater does not natively support granular exclusion lists.
+
+### 2. Store user data in `%LOCALAPPDATA%\DevStackBox\`
+
+**Accepted.** Windows convention for per-user app data. `%LOCALAPPDATA%\DevStackBox\` keeps projects and databases out of the install directory and safe from updates. Override with `DEVSTACKBOX_DATA_DIR` when needed.
+
+### 3. Portable mode with everything in one folder, no updates
+
+**Deferred.** Portable mode is a valid use case but explicitly conflicts with auto-updates. Attempting to support both in v1 doubles the complexity of every path decision. Portable mode is deferred to a future version where it will be clearly marked as "no auto-updates."
+
+---
+
+## Consequences
+
+### Positive
+
+- Auto-updates become safe: replacing App Root never touches user data
+- Clear mental model for users: "my projects are in `%LOCALAPPDATA%\DevStackBox\www\`"
+- MySQL database files are protected from update accidents
+- Allows future features like "open data folder" button in the UI
+
+### Negative
+
+- Requires implementing `get_user_data_path()` alongside `get_installation_path()` in Rust
+- Migration work needed: existing installations have the mixed layout
+- First-run setup must ask for or confirm the user data path
+- Config file paths in `httpd.conf` and `my.cnf` must point to the User Data Root, not the App Root
+
+### Migration Path for Existing Installations
+
+When a user with v0.1.x (mixed layout) updates to v0.2.0 (separated layout):
+
+1. App detects no User Data Root exists at first launch
+2. Uses `%LOCALAPPDATA%\DevStackBox\` as the default data directory (or honors `DEVSTACKBOX_DATA_DIR`)
+3. Migrates existing `www/`, `mysql/data/`, `logs/`, `config/` to the new location
+4. Updates config file paths to point to new locations
+5. Backs up original directory before migrating
+
+---
+
+## Implementation Reference
+
+See `reference/installer` for the complete update flow, config versioning strategy, and the pre-update checklist.
+
+Tracked in roadmap as Phase 1.8.
