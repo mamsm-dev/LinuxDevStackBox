@@ -1,0 +1,42 @@
+#!/usr/bin/make -f
+# Debian packaging rules for LinuxDevStackBox.
+#
+# The upstream build is npm (Vite frontend) + cargo (Tauri backend). The
+# binary is built from source here; no prebuilt artifacts are shipped.
+# phpMyAdmin is staged by `npm run prebuild` (scripts/stage-phpmyadmin.mjs)
+# and installed read-only under /usr/lib/linuxdevstackbox; the application
+# clones it into the user's XDG data directory on first run.
+
+export DEB_BUILD_MAINT_OPTIONS := hardening=+all
+
+%:
+	dh $@
+
+override_dh_auto_build:
+	npm ci --no-audit --no-fund
+	npm run prebuild
+	npm run build
+	cd src-tauri && cargo build --release --frozen
+
+override_dh_auto_install:
+	install -Dm755 src-tauri/target/release/linuxdevstackbox \
+		debian/linuxdevstackbox/usr/bin/linuxdevstackbox
+	install -d debian/linuxdevstackbox/usr/lib/linuxdevstackbox/phpmyadmin
+	cp -a packaging/phpmyadmin-runtime/. \
+		debian/linuxdevstackbox/usr/lib/linuxdevstackbox/phpmyadmin/
+	install -Dm644 packaging/arch/linuxdevstackbox.desktop \
+		debian/linuxdevstackbox/usr/share/applications/com.mam.linuxdevstackbox.desktop
+	for size in 32x32 64x64 128x128; do \
+		install -Dm644 "src-tauri/icons/$${size}.png" \
+			"debian/linuxdevstackbox/usr/share/icons/hicolor/$${size}/apps/linuxdevstackbox.png"; \
+	done
+	install -Dm644 LICENSE \
+		debian/linuxdevstackbox/usr/share/doc/linuxdevstackbox/copyright
+
+# The release binary is built in release mode; avoid a duplicate build.
+override_dh_auto_test:
+	:
+
+override_dh_strip:
+	# Stripping the Rust binary is fine, but keep debhelper from mangling it.
+	dh_strip --no-automatic-dbgsym

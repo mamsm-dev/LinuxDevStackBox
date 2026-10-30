@@ -1,0 +1,9 @@
+linuxdevstackbox (0.1.22-1) unstable; urgency=medium
+
+  * First Linux-only release: the Windows platform is removed entirely.
+  * Apache, MariaDB/MySQL and PHP are managed from distribution packages
+    with per-user XDG configuration; the application runs unprivileged.
+  * Native .deb packaging with declared runtime dependencies, desktop
+    entry and icons.
+
+ -- MAM <mamsm-dev@users.noreply.github.com>  Sat, 31 Oct 2026 00:00:00 +0000

@@ -64,6 +64,15 @@ phpmyadmin/config.secret.inc.php
 /packaging/.phpmyadmin-stage-*/
 /packaging/.phpmyadmin-previous-*/
 
+# Generated packages (built locally, published by CI)
+/packaging/arch/*.pkg.tar.zst
+/packaging/arch/*.tar.gz
+/packaging/arch/src/
+/packaging/arch/pkg/
+/packaging/arch/pkg/
+/deb/
+/dist/
+
 # Application runtime data
 www/tmp/
 www/cache/
