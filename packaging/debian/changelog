@@ -1,3 +1,13 @@
+linuxdevstackbox (0.1.25-1) unstable; urgency=medium
+
+  * Arch CI installs the declared runtime dependency stack and builds
+    with makepkg --syncdeps.
+  * Single debhelper compatibility declaration (debhelper-compat = 13).
+  * Cargo builds use --locked so the committed Cargo.lock is enforced
+    while crates resolve in fresh build environments.
+
+ -- MAM <mamsm-dev@users.noreply.github.com>  Sat, 31 Oct 2026 00:00:00 +0000
+
 linuxdevstackbox (0.1.24-1) unstable; urgency=medium
 
   * Automated release pipeline: GitHub Actions builds the Arch, Debian,

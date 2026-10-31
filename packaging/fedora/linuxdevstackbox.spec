@@ -1,8 +1,8 @@
 # Fedora/RHEL package for the LinuxDevStackBox desktop application.
 #
 # Build from a source tarball (created from a git checkout):
-#   git archive --prefix=linuxdevstackbox-0.1.24/ \
-#     -o linuxdevstackbox-0.1.24.tar.gz HEAD
+#   git archive --prefix=linuxdevstackbox-0.1.25/ \
+#     -o linuxdevstackbox-0.1.25.tar.gz HEAD
 #   rpmbuild -bb --define "_sourcedir $PWD" --define "_rpmdir $PWD/dist" \
 #     packaging/fedora/linuxdevstackbox.spec
 #
@@ -12,7 +12,7 @@
 # user's XDG data directory on first run.
 
 Name:           linuxdevstackbox
-Version:        0.1.24
+Version:        0.1.25
 Release:        1%{?dist}
 Summary:        Local PHP development environment for Linux
 License:        MIT
@@ -86,6 +86,13 @@ install -Dm644 LICENSE %{buildroot}%{_licensedir}/%{name}/LICENSE
 %license LICENSE
 
 %changelog
+* Sat Oct 31 2026 MAM <mamsm-dev@users.noreply.github.com> - 0.1.25-1
+- Arch CI installs the declared runtime dependency stack and builds with
+  makepkg --syncdeps.
+- Single debhelper compatibility declaration (debhelper-compat = 13).
+- Cargo builds use --locked so the committed Cargo.lock is enforced
+  while crates resolve in fresh build environments.
+
 * Sat Oct 31 2026 MAM <mamsm-dev@users.noreply.github.com> - 0.1.24-1
 - Automated release pipeline: GitHub Actions builds Arch, Debian, Fedora
   and AppImage artifacts from version tags and publishes releases with

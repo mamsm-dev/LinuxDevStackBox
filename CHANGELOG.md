@@ -6,6 +6,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [0.1.25] - 2026-10-31
+
+### Fixed
+
+- Arch packaging job installs the declared runtime dependency stack (apache, mariadb, mariadb-clients, php, php-cgi, openssl - names verified against the official repositories) and builds with `makepkg --syncdeps` as a non-root builder with pacman-only sudo.
+- Debian packaging declares exactly one debhelper compatibility level (`debhelper-compat (= 13)`); the obsolete `debian/compat` file was removed.
+- The Arch, Debian and Fedora package builds use `cargo build --locked` instead of `--frozen`, enforcing the committed Cargo.lock while allowing crates to resolve in fresh build environments.
+
 ## [0.1.24] - 2026-10-31
 
 LinuxDevStackBox 0.1.24 continues the Linux-only application line (first shipped as v0.1.22): the Windows platform is removed and the application is built around the Apache, MariaDB/MySQL and PHP packages of Arch, Debian and Fedora.

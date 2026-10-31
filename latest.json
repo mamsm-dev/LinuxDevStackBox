@@ -1,5 +1,5 @@
 {
-  "version": "0.1.24",
-  "notes": "LinuxDevStackBox 0.1.24: automated GitHub Actions release pipeline (Arch, Debian, Fedora, AppImage with SHA256SUMS), corrected Debian build dependencies and CI fixes.",
+  "version": "0.1.25",
+  "notes": "LinuxDevStackBox 0.1.25: release packaging fixes - Arch CI installs the declared runtime dependency stack, a single debhelper compat declaration, and cargo --locked builds for the Arch, Debian and Fedora packages.",
   "pub_date": "2026-10-30T22:16:14.336Z"
 }
