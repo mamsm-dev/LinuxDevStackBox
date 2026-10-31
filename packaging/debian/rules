@@ -16,7 +16,7 @@ override_dh_auto_build:
 	npm ci --no-audit --no-fund
 	npm run prebuild
 	npm run build
-	cd src-tauri && cargo build --release --frozen
+	cd src-tauri && cargo build --release --locked
 
 override_dh_auto_install:
 	install -Dm755 src-tauri/target/release/linuxdevstackbox \

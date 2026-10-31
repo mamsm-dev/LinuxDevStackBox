@@ -60,7 +60,7 @@ by installing a private CA into the system trust store.
 npm ci --no-audit --no-fund
 npm run prebuild
 npm run build
-cd src-tauri && cargo build --release --frozen
+cd src-tauri && cargo build --release --locked
 
 %install
 install -Dm755 src-tauri/target/release/linuxdevstackbox \

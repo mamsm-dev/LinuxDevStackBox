@@ -104,9 +104,16 @@ jobs:
     runs-on: ubuntu-latest
     container: archlinux:base-devel
     steps:
-      - name: Install build dependencies
+      - name: Install build and runtime dependencies
         run: |
-          pacman -Syu --noconfirm git nodejs npm rust webkit2gtk-4.1
+          # Initialize the package database, then install the PKGBUILD's
+          # makedepends AND its runtime dependencies: makepkg resolves the
+          # full dependency graph before building, and the app's runtime
+          # stack (apache, mariadb, php, php-cgi, openssl) is declared via
+          # real package names verified against the official repositories.
+          pacman -Syu --noconfirm \
+            git nodejs npm rust webkit2gtk-4.1 \
+            apache mariadb mariadb-clients php php-cgi openssl
       - name: Check out the repository
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
       - name: Mark the workspace as a safe directory
@@ -122,7 +129,12 @@ jobs:
         run: |
           useradd -m builder
           chown -R builder:builder "$GITHUB_WORKSPACE"
-          su builder -c "cd packaging/arch && makepkg -f"
+          # makepkg refuses to run as root; give the builder account
+          # passwordless access to pacman only, so --syncdeps can verify
+          # and install the declared dependency set itself.
+          echo 'builder ALL=(ALL) NOPASSWD: /usr/bin/pacman' > /etc/sudoers.d/builder-pacman
+          chmod 440 /etc/sudoers.d/builder-pacman
+          su builder -c "cd packaging/arch && makepkg --syncdeps --noconfirm"
       - name: Validate the built package
         run: |
           pkg="$(ls packaging/arch/*.pkg.tar.zst)"

@@ -42,7 +42,7 @@ build() {
 
   msg2 "Building the application"
   cd src-tauri
-  cargo build --release --frozen
+  cargo build --release --locked
 }
 
 package() {
