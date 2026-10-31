@@ -14,16 +14,19 @@ Releases are automated. Pushing a version tag `v<major>.<minor>.<patch>` (for ex
 | Arch Linux and derivatives | `.pkg.tar.zst` (from [packaging/arch/PKGBUILD](https://github.com/mamsm-dev/LinuxDevStackBox/blob/main/packaging/arch/PKGBUILD)) | `archlinux:base-devel` container with `makepkg` |
 | Debian and derivatives | `.deb` (from [packaging/debian](https://github.com/mamsm-dev/LinuxDevStackBox/blob/main/packaging/debian/control)) | Ubuntu 24.04 runner with `dpkg-buildpackage` |
 | Fedora and RPM derivatives | `.rpm` (from [packaging/fedora/linuxdevstackbox.spec](https://github.com/mamsm-dev/LinuxDevStackBox/blob/main/packaging/fedora/linuxdevstackbox.spec)) | `fedora:latest` container with `rpmbuild` |
+| Any x86_64 Linux (portable bundle) | `.AppImage` (Tauri bundler) | Ubuntu 24.04 runner |
 
-No other formats (AppImage, Snap, Flatpak) are produced. Windows is not supported.
+Snap and Flatpak are not produced. Windows is not supported. Every release also ships a `SHA256SUMS` file covering all four assets.
 
 ## Pipeline overview
 
 Three workflows live in `.github/workflows/`:
 
 - **`ci.yml`** — runs on every push to `main` and every pull request: frontend build and tests, Rust tests and clippy, packaging metadata consistency, Debian changelog/control parsing, RPM spec parsing and PKGBUILD source-info generation. It never publishes anything.
-- **`build-packages.yml`** — a reusable workflow that builds one package per job in the matching environment (Arch container, Ubuntu runner, Fedora container), runs makepkg/dpkg-buildpackage/rpmbuild as the intended non-root build flow, validates the produced package metadata (`pacman -Qip`, `dpkg-deb --info` + lintian, `rpm -qip`), and uploads one artifact per format.
-- **`release.yml`** — triggered only by pushing a `v*` tag. It validates the tag against every project manifest, calls the build workflow, downloads the three artifacts, verifies exactly one package per format is present and that every file name carries the released version, generates `SHA256SUMS`, and creates the GitHub Release with GitHub-generated notes. Only this job has `contents: write`; every build job is read-only.
+- **`build-packages.yml`** — a reusable workflow that builds one package per job in the matching environment (Arch container, Ubuntu runners, Fedora container), runs makepkg/dpkg-buildpackage/rpmbuild and the Tauri AppImage bundler, validates each produced package (`pacman -Qip`, `dpkg-deb --info` + lintian, `rpm -qip`, ELF check for the AppImage), and uploads one artifact per format. This workflow NEVER publishes a release - it only uploads artifacts; a banner job in the run output says so explicitly.
+- **`release.yml`** — triggered only by pushing a `v*` tag. It first validates the run context (loudly failing if the event is not a tag push matching `v*`), then the tag against every project manifest, calls the build workflow, downloads the four artifacts, verifies exactly one package per format is present and that every file name carries the released version (naming the missing format and its build job if not), generates `SHA256SUMS`, and creates the GitHub Release with GitHub-generated notes, a title, and `--latest`. Only the publish job has `contents: write`; every build job is read-only. A concurrency group keyed on the tag prevents duplicate publication.
+
+Note: GitHub fires the tag trigger only when the pushed tag points at a commit that contains `.github/workflows/release.yml`. Always tag the current reviewed tip of `main`, not an older commit.
 
 ## Version consistency
 
