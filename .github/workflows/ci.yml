@@ -60,7 +60,12 @@ jobs:
           grep -q '^Source: linuxdevstackbox$' packaging/debian/control
           grep -q '^Package: linuxdevstackbox$' packaging/debian/control
           grep -q '^Architecture: amd64$' packaging/debian/control
-          grep -q '^Depends:.*apache2' packaging/debian/control
+          # Depends is a wrapped field: apache2 may sit on a continuation
+          # line, so search the binary stanza, not the field's first line.
+          sed -n '/^Package: linuxdevstackbox$/,/^$/p' packaging/debian/control \
+            | grep -qE '^ apache2,?$|^Depends:.*apache2'
+      - name: Check Debian rules syntax
+        run: make -nf packaging/debian/rules >/dev/null
       - name: Parse RPM spec
         run: rpmspec --parse packaging/fedora/linuxdevstackbox.spec >/dev/null
 
@@ -76,9 +81,12 @@ jobs:
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
       - name: Verify packaging metadata consistency
         run: node scripts/verify-packaging-metadata.mjs
-      - name: Generate source package info
+      - name: Generate .SRCINFO as a non-root user
         run: |
-          cd packaging/arch
-          makepkg --printsrcinfo > /tmp/srcinfo.txt
-          grep -q "pkgver = " /tmp/srcinfo.txt
+          # makepkg refuses to run as root.
+          useradd -m builder
+          chown -R builder:builder "$GITHUB_WORKSPACE"
+          su builder -c "cd packaging/arch && makepkg --printsrcinfo" > /tmp/srcinfo.txt
+          cat /tmp/srcinfo.txt
           grep -q "pkgname = linuxdevstackbox" /tmp/srcinfo.txt
+          grep -q "pkgver = $(sed -n 's/^pkgver=\(.*\)$/\1/p' packaging/arch/PKGBUILD)" /tmp/srcinfo.txt
