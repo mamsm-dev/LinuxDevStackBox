@@ -1,0 +1,38 @@
+# README.source for linuxdevstackbox
+
+## Toolchain requirements not declared in Build-Depends
+
+Building this package requires a Node.js >= 20 (with npm) and a Rust
+>= 1.77.2 toolchain (with cargo), in addition to the dependencies declared
+in debian/control.
+
+They are intentionally NOT listed in Build-Depends: the toolchain packages
+shipped in current Debian stable releases (rustc/cargo from 1.7x on recent
+releases, nodejs 18 on Ubuntu 24.04) are older than the versions the
+upstream project requires and supports. Declaring them would advertise
+buildability that the declared packages cannot actually provide.
+
+Build environments (CI or local) must therefore provide these toolchains
+themselves - for example rustup's stable toolchain and NodeSource or a
+version manager for Node.js - and put them on PATH before running
+dpkg-buildpackage. The debian/rules build invokes `npm` and `cargo` from
+PATH.
+
+## Build overview
+
+debian/rules performs the real upstream build:
+
+1. `npm ci` + `npm run prebuild` + `npm run build` (Vite frontend; the
+   prebuild step stages the phpMyAdmin runtime into
+   packaging/phpmyadmin-runtime from the vendored phpmyadmin/ source).
+2. `cargo build --release --frozen` in src-tauri (the Tauri backend;
+   Cargo.lock pins the dependency set).
+
+The resulting binary, the staged phpMyAdmin runtime, the desktop entry and
+the hicolor icons are installed under /usr. Runtime dependencies (Apache,
+MariaDB, PHP, the WebKitGTK/GTK libraries, polkit) are declared in the
+binary package stanza of debian/control.
+
+All declared Build-Depends are satisfied by packages from the Debian/Ubuntu
+archives; no package in the build depends on files outside the source tree
+and the documented toolchains.
