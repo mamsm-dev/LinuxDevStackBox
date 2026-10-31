@@ -4,7 +4,7 @@
 
 | Version | Security fixes |
 | ------- | -------------- |
-| v0.1.25+ (Linux) | Yes |
+| v0.1.26+ (Linux) | Yes |
 | Older, Windows builds | Not supported; the Windows platform is end-of-life |
 
 ## Report a vulnerability

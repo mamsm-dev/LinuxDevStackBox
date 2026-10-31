@@ -2,14 +2,14 @@
 # Arch Linux package for the LinuxDevStackBox desktop application.
 #
 # Build from the repository root:
-#   git archive --prefix=linuxdevstackbox/ -o linuxdevstackbox-0.1.25.tar.gz HEAD
+#   git archive --prefix=linuxdevstackbox/ -o linuxdevstackbox-0.1.26.tar.gz HEAD
 #   cd packaging/arch && makepkg -f
 #
 # The application manages Apache, MariaDB and PHP from distribution packages,
 # which are hard runtime dependencies. phpMyAdmin ships inside the package.
 
 pkgname=linuxdevstackbox
-pkgver=0.1.25
+pkgver=0.1.26
 pkgrel=1
 pkgdesc="Local PHP development environment for Linux: Apache, MariaDB, PHP and phpMyAdmin with per-user configuration"
 arch=('x86_64')

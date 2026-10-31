@@ -1,6 +1,6 @@
 {
   "name": "linuxdevstackbox",
-  "version": "0.1.25",
+  "version": "0.1.26",
   "description": "A lightweight, open-source local development environment for PHP developers on Linux",
   "type": "module",
   "scripts": {

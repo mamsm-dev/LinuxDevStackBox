@@ -1,5 +1,5 @@
 {
-  "version": "0.1.25",
-  "notes": "LinuxDevStackBox 0.1.25: release packaging fixes - Arch CI installs the declared runtime dependency stack, a single debhelper compat declaration, and cargo --locked builds for the Arch, Debian and Fedora packages.",
+  "version": "0.1.26",
+  "notes": "LinuxDevStackBox 0.1.26: release pipeline fixes - the unused rustls/ring TLS stack was removed (fixes the Arch link failure), Debian packaging validation was repaired (polkitd dependency, man page, changelog and description), and Fedora RPM artifact discovery was corrected.",
   "pub_date": "2026-10-30T22:16:14.336Z"
 }

@@ -1,3 +1,13 @@
+linuxdevstackbox (0.1.26-1) unstable; urgency=medium
+
+  * Remove the unused rustls/ring TLS stack that broke Rust linking in
+    the Arch build.
+  * Repair Debian package validation: polkitd dependency, real manual
+    page, changelog and description formatting.
+  * Correct Fedora RPM artifact discovery (rpmbuild output layout).
+
+ -- MAM <mamsm-dev@users.noreply.github.com>  Sat, 31 Oct 2026 18:00:00 +0000
+
 linuxdevstackbox (0.1.25-1) unstable; urgency=medium
 
   * Arch CI installs the declared runtime dependency stack and builds

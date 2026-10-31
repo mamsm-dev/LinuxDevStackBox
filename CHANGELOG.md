@@ -6,6 +6,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [0.1.26] - 2026-10-31
+
+### Fixed
+
+- Rust linking in the Arch package build: the unused `rustls-tls` feature pulled an entire rustls/ring TLS stack alongside the native-tls backend the application actually uses, producing undefined `ring_core_*` symbols at link time. The feature (and the whole stack) is removed; the HTTPS certificate probe is unaffected.
+- Debian package validation: obsolete `policykit-1` dependency replaced with `polkitd`, `lsb-base` declared, a real manual page is shipped, the changelog and extended description follow Debian formatting, and the phpMyAdmin embedded-JavaScript warnings carry a justified lintian override.
+- Fedora release job discovers the application RPM (rpmbuild places output under `dist/x86_64/`, not `dist/RPMS/x86_64/`) instead of failing after a successful build.
+- Package validation listings (`dpkg-deb --contents`, `pacman -Qlp`, `rpm -qpl`) are captured to files before grepping, so an early-exiting `grep -q` can no longer SIGPIPE-kill the producer ("tar: stdout: write error").
+
 ## [0.1.25] - 2026-10-31
 
 ### Fixed
