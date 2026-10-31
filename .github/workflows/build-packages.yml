@@ -139,9 +139,13 @@ jobs:
         run: |
           pkg="$(ls packaging/arch/*.pkg.tar.zst)"
           pacman -Qip "$pkg"
-          pacman -Qlp "$pkg" | grep -E 'usr/bin/linuxdevstackbox$'
-          pacman -Qlp "$pkg" | grep -qE 'usr/lib/linuxdevstackbox/phpmyadmin/index\.php$'
-          pacman -Qlp "$pkg" | grep -qE 'usr/share/applications/com\.mam\.linuxdevstackbox\.desktop$'
+          # Capture the listing once: piping long listings into "grep -q"
+          # lets the early-exiting grep SIGPIPE-kill the producer (observed
+          # as "tar: stdout: write error" in the Debian job).
+          pacman -Qlp "$pkg" > /tmp/pkg-contents.txt
+          grep -E 'usr/bin/linuxdevstackbox$' /tmp/pkg-contents.txt
+          grep -qE 'usr/lib/linuxdevstackbox/phpmyadmin/index\.php$' /tmp/pkg-contents.txt
+          grep -qE 'usr/share/applications/com\.mam\.linuxdevstackbox\.desktop$' /tmp/pkg-contents.txt
       - name: Upload the Arch package
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
@@ -193,9 +197,13 @@ jobs:
         run: |
           pkg="$(ls linuxdevstackbox_*.deb)"
           dpkg-deb --info "$pkg"
-          dpkg-deb --contents "$pkg" | grep -E 'usr/bin/linuxdevstackbox$'
-          dpkg-deb --contents "$pkg" | grep -qE 'usr/lib/linuxdevstackbox/phpmyadmin/index\.php$'
-          dpkg-deb --contents "$pkg" | grep -qE 'usr/share/applications/com\.mam\.linuxdevstackbox\.desktop$'
+          # Capture the listing once: "dpkg-deb --contents | grep -q"
+          # SIGPIPE-kills dpkg-deb's internal tar ("tar: stdout: write
+          # error", "tar subprocess returned error exit status 2").
+          dpkg-deb --contents "$pkg" > /tmp/deb-contents.txt
+          grep -E 'usr/bin/linuxdevstackbox$' /tmp/deb-contents.txt
+          grep -qE 'usr/lib/linuxdevstackbox/phpmyadmin/index\.php$' /tmp/deb-contents.txt
+          grep -qE 'usr/share/applications/com\.mam\.linuxdevstackbox\.desktop$' /tmp/deb-contents.txt
           lintian --fail-on error "$pkg"
       - name: Upload the Debian package
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
@@ -234,17 +242,32 @@ jobs:
             packaging/fedora/linuxdevstackbox.spec
       - name: Validate the built package
         run: |
-          pkg="$(ls dist/RPMS/*/*.rpm)"
+          # rpmbuild appends only the arch directory under _rpmdir, so the
+          # real output lives at dist/x86_64/ (not dist/RPMS/x86_64/).
+          # Discover the application RPM instead of hardcoding a directory,
+          # excluding source and debuginfo RPMs, and fail clearly if the
+          # build did not produce exactly one.
+          pkg="$(find dist -type f -name "${PACKAGE_NAME}-*.x86_64.rpm" ! -name "*debuginfo*" | head -1)"
+          if [ -z "$pkg" ]; then
+            echo "ERROR: no application RPM was produced under dist/. Contents:" >&2
+            find dist -type f >&2 || true
+            exit 1
+          fi
+          echo "Validating: $pkg"
           rpm -qip "$pkg"
-          rpm -qpl "$pkg" | grep -E 'usr/bin/linuxdevstackbox$'
-          rpm -qpl "$pkg" | grep -qE 'usr/lib/linuxdevstackbox/phpmyadmin/index\.php$'
-          rpm -qpl "$pkg" | grep -qE 'usr/share/applications/com\.mam\.linuxdevstackbox\.desktop$'
+          rpm -qpl "$pkg" > /tmp/rpm-contents.txt
+          grep -E 'usr/bin/linuxdevstackbox$' /tmp/rpm-contents.txt
+          grep -qE 'usr/lib/linuxdevstackbox/phpmyadmin/index\.php$' /tmp/rpm-contents.txt
+          grep -qE 'usr/share/applications/com\.mam\.linuxdevstackbox\.desktop$' /tmp/rpm-contents.txt
+          test "$(find dist -type f -name "${PACKAGE_NAME}-*.x86_64.rpm" ! -name "*debuginfo*" | wc -l)" -eq 1
           # The binary must be x86_64 and the package must declare its deps.
-          rpm -qp --qf '%{ARCH}\n' "$pkg" | grep -qx x86_64
-          rpm -qp --requires "$pkg" | grep -q httpd
+          rpm -qp --qf '%{ARCH}\n' "$pkg" > /tmp/rpm-arch.txt
+          grep -qx x86_64 /tmp/rpm-arch.txt
+          rpm -qp --requires "$pkg" > /tmp/rpm-requires.txt
+          grep -q httpd /tmp/rpm-requires.txt
       - name: Upload the Fedora package
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: rpm-package
-          path: dist/RPMS/*/*.rpm
+          path: dist/*/${PACKAGE_NAME}-*.x86_64.rpm
           if-no-files-found: error
