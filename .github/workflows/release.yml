@@ -1,9 +1,12 @@
 name: Release
 
 # Publishes a GitHub Release when a version tag (v<major>.<minor>.<patch>)
-# is pushed. The tag version is validated against every project manifest
-# before any build starts; the release only appears if all three packages
-# built successfully and carry the same version.
+# is pushed. Pull requests and branch pushes can never reach this workflow:
+# the only trigger below is a tag push.
+#
+# IMPORTANT: GitHub only fires this workflow if the pushed tag points at a
+# commit that contains this file. Tag the current main tip, not an older
+# commit.
 
 on:
   push:
@@ -13,15 +16,41 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
 jobs:
+  release-context:
+    name: Validate release context
+    runs-on: ubuntu-latest
+    steps:
+      - name: Fail loudly unless this run is a v* tag push
+        run: |
+          echo "event_name   = ${{ github.event_name }}"
+          echo "ref          = ${{ github.ref }}"
+          echo "ref_type     = ${{ github.ref_type }}"
+          echo "ref_name     = ${{ github.ref_name }}"
+          if [ "${{ github.event_name }}" != "push" ] || [ "${{ github.ref_type }}" != "tag" ]; then
+            echo "ERROR: this workflow must be triggered by pushing a tag." >&2
+            exit 1
+          fi
+          case "${{ github.ref_name }}" in
+            v*) echo "Tag ${{ github.ref_name }} accepted; building release." ;;
+            *) echo "ERROR: tag '${{ github.ref_name }}' does not match v<version>; no release will be published." >&2; exit 1 ;;
+          esac
+
   validate-version:
     name: Validate tag version
+    needs: release-context
     runs-on: ubuntu-latest
     steps:
       - name: Check out the repository
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
       - name: Verify the tag matches every project manifest
-        run: node scripts/verify-packaging-metadata.mjs "${{ github.ref_name }}"
+        run: |
+          echo "Tag: ${{ github.ref_name }}"
+          node scripts/verify-packaging-metadata.mjs "${{ github.ref_name }}"
 
   build:
     name: Build all packages
@@ -42,34 +71,68 @@ jobs:
         with:
           path: release
           merge-multiple: true
+      - name: Report downloaded artifacts
+        run: |
+          echo "Artifacts downloaded into ./release:"
+          ls -la release
       - name: Verify all package formats and versions
         run: |
           version="${{ github.ref_name }}"
           version="${version#v}"
           cd release
-          ls -la
+          fail_missing() {
+            echo "ERROR: no $1 package was downloaded. Check the '$2' build job and its artifact '$3'." >&2
+            exit 1
+          }
+          arch_pkg="$(ls -1 *.pkg.tar.zst 2>/dev/null | head -1)"
+          [ -n "$arch_pkg" ] || fail_missing "Arch (.pkg.tar.zst)" "arch" "arch-package"
+          deb_pkg="$(ls -1 *_amd64.deb 2>/dev/null | head -1)"
+          [ -n "$deb_pkg" ] || fail_missing "Debian (.deb)" "deb" "deb-package"
+          rpm_pkg="$(ls -1 *.x86_64.rpm 2>/dev/null | head -1)"
+          [ -n "$rpm_pkg" ] || fail_missing "Fedora (.rpm)" "rpm" "rpm-package"
+          appimage_pkg="$(ls -1 *.AppImage 2>/dev/null | head -1)"
+          [ -n "$appimage_pkg" ] || fail_missing "AppImage (.AppImage)" "appimage" "appimage-package"
           test "$(ls -1 *.pkg.tar.zst | wc -l)" -eq 1
           test "$(ls -1 *_amd64.deb | wc -l)" -eq 1
           test "$(ls -1 *.x86_64.rpm | wc -l)" -eq 1
-          for file in *.pkg.tar.zst *_amd64.deb *.x86_64.rpm; do
+          test "$(ls -1 *.AppImage | wc -l)" -eq 1
+          for file in *.pkg.tar.zst *_amd64.deb *.x86_64.rpm *.AppImage; do
             case "$file" in
               *"$version"*) ;;
-              *) echo "ERROR: $file does not carry the released version $version"; exit 1 ;;
+              *) echo "ERROR: $file does not carry the released version $version." >&2; exit 1 ;;
             esac
           done
-          echo "All three package formats present with version $version."
+          echo "All four release assets present with version $version:"
+          echo "  $arch_pkg"
+          echo "  $deb_pkg"
+          echo "  $rpm_pkg"
+          echo "  $appimage_pkg"
       - name: Generate SHA256 checksums
         run: |
           cd release
-          sha256sum *.pkg.tar.zst *_amd64.deb *.x86_64.rpm > SHA256SUMS
+          sha256sum *.pkg.tar.zst *_amd64.deb *.x86_64.rpm *.AppImage > SHA256SUMS
           cat SHA256SUMS
       - name: Create the GitHub Release
         env:
           GH_TOKEN: ${{ github.token }}
           TAG: ${{ github.ref_name }}
         run: |
+          # Fail with an explicit message if a release for this tag already
+          # exists, instead of an opaque API error from gh release create.
+          if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" > /dev/null 2>&1; then
+            echo "ERROR: a release for tag $TAG already exists. Delete it (or the tag) and re-tag to publish again." >&2
+            exit 1
+          fi
           gh release create "$TAG" \
             --repo "$GITHUB_REPOSITORY" \
             --verify-tag \
+            --title "LinuxDevStackBox $TAG" \
+            --latest \
             --generate-notes \
-            release/SHA256SUMS release/*.pkg.tar.zst release/*_amd64.deb release/*.x86_64.rpm
+            release/SHA256SUMS \
+            release/*.pkg.tar.zst \
+            release/*_amd64.deb \
+            release/*.x86_64.rpm \
+            release/*.AppImage
+          gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json name,isDraft,url \
+            --jq '"Published: " + .name + " draft=" + (.isDraft|tostring) + " url=" + .url'
