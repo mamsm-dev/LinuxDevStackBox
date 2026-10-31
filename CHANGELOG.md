@@ -6,9 +6,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
-## [0.2.0] - 2026-10-30
+## [0.1.24] - 2026-10-31
 
-LinuxDevStackBox 0.2.0 is the first Linux-only release. The Windows platform is completely removed; the application is rebuilt around the Apache, MariaDB/MySQL and PHP packages of Arch, Debian and Fedora.
+LinuxDevStackBox 0.1.24 continues the Linux-only application line (first shipped as v0.1.22): the Windows platform is removed and the application is built around the Apache, MariaDB/MySQL and PHP packages of Arch, Debian and Fedora.
+
+### Added
+
+- Automated release pipeline: pushing a `v*` tag makes GitHub Actions build the Arch `.pkg.tar.zst`, Debian `.deb`, Fedora `.rpm` and a portable AppImage in their native environments, validate each with the distribution's own tools, and publish a GitHub Release with a `SHA256SUMS` file covering all four assets.
+- Debian packaging directory (`packaging/debian`: control, debhelper rules, changelog, DEP-5 copyright) and Fedora RPM spec (`packaging/fedora/linuxdevstackbox.spec`) building the application from source with `dpkg-buildpackage` and `rpmbuild`.
+- A packaging metadata verifier (`scripts/verify-packaging-metadata.mjs`) that fails CI when package.json, tauri.conf.json, Cargo.toml, Cargo.lock, PKGBUILD, the Debian changelog, the RPM spec and a pushed release tag disagree on the version.
+- CI workflow with frontend/Rust checks, packaging configuration lint (Debian changelog/control parsing, RPM spec parsing, PKGBUILD source-info generation) and build jobs per distribution container. The Windows platform is completely removed; the application is rebuilt around the Apache, MariaDB/MySQL and PHP packages of Arch, Debian and Fedora.
 
 ### Added
 
@@ -19,6 +26,7 @@ LinuxDevStackBox 0.2.0 is the first Linux-only release. The Windows platform is 
 - XDG Base Directory layout: configuration in `~/.config/linuxdevstackbox`, data (logs, MySQL data, www, backups, phpMyAdmin copy) in `~/.local/share/linuxdevstackbox`, overridable with `LINUXDEVSTACKBOX_DATA_DIR`.
 - `/proc`-based process ownership: services are identified by executable name plus their generated configuration, so system Apache/MySQL instances are never touched; children run in isolated process groups.
 - XDG autostart support and an integrated terminal that spawns the user's login shell.
+- AppImage as a fourth release artifact, built with the Tauri bundler.
 
 ### Changed
 
@@ -27,6 +35,7 @@ LinuxDevStackBox 0.2.0 is the first Linux-only release. The Windows platform is 
 - The in-app updater is now check-only: it reports newer releases and points at the package-manager upgrade instead of self-installing.
 - phpMyAdmin is cloned into the writable user data directory on first run.
 - MySQL root credentials are stored in a 0600 file under the XDG config directory.
+- Debian build dependencies declare only apt-providable packages; the Node.js >= 20 and Rust >= 1.77.2 toolchains are documented environment requirements (packaging/debian/README.source).
 
 ### Removed
 

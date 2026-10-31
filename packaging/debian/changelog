@@ -1,3 +1,15 @@
+linuxdevstackbox (0.1.24-1) unstable; urgency=medium
+
+  * Automated release pipeline: GitHub Actions builds the Arch, Debian,
+    Fedora and AppImage artifacts from version tags and publishes
+    releases with a SHA256SUMS file.
+  * Correct Debian build dependencies; declare only apt-providable
+    packages and document the environment-provided Node/Rust toolchains.
+  * Fix CI container git ownership handling and non-root .SRCINFO
+    generation.
+
+ -- MAM <mamsm-dev@users.noreply.github.com>  Sat, 31 Oct 2026 00:00:00 +0000
+
 linuxdevstackbox (0.1.22-1) unstable; urgency=medium
 
   * First Linux-only release: the Windows platform is removed entirely.

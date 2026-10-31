@@ -2,7 +2,7 @@
 
 > Practical environment context for working on PHP applications served by LinuxDevStackBox on Linux. Read this file before choosing PHP, running Composer or Artisan, connecting to MySQL, or changing server configuration.
 
-Maintained: 30 October 2026. Baseline: v0.1.22 (Linux). Installed builds can differ; verify their behavior. This guide describes the environment, not permission to change it. Follow the user's task and the application's own instructions.
+Maintained: 30 October 2026. Baseline: v0.1.24 (Linux). Installed builds can differ; verify their behavior. This guide describes the environment, not permission to change it. Follow the user's task and the application's own instructions.
 
 ## Give this file to your AI tool
 

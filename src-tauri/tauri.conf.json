@@ -1,7 +1,7 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "LinuxDevStackBox",
-  "version": "0.1.22",
+  "version": "0.1.24",
   "identifier": "com.mam.linuxdevstackbox",
   "build": {
     "beforeDevCommand": "npm run dev",
@@ -45,7 +45,7 @@
       "../packaging/phpmyadmin-runtime": "phpmyadmin"
     },
     "externalBin": [],
-    "copyright": "© 2026 MAM",
+    "copyright": "\u00a9 2026 MAM",
     "category": "Development",
     "shortDescription": "Local PHP development environment for Linux",
     "longDescription": "LinuxDevStackBox is a local PHP development environment for Linux: it manages Apache, MySQL/MariaDB, PHP and phpMyAdmin from distribution packages with per-user configuration, virtual hosts, trusted local HTTPS, database tooling and an integrated terminal.",
