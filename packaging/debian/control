@@ -32,7 +32,8 @@ Depends:
  php-cgi,
  libnss3-tools,
  openssl,
- policykit-1,
+ polkitd,
+ lsb-base,
  libwebkit2gtk-4.1-0,
  libgtk-3-0,
  libayatana-appindicator3-1
@@ -40,7 +41,10 @@ Recommends: xdg-utils, polkit
 Description: Local PHP development environment for Linux
  LinuxDevStackBox manages Apache, MySQL/MariaDB, PHP and phpMyAdmin for
  local PHP development from a single desktop application. Runtimes come
- from the distribution packages; the app generates per-user configuration
- under the XDG directories, runs everything as the logged-in user, maps
- .test hostnames in /etc/hosts via polkit and provides trusted local
- HTTPS by installing a private CA into the system trust store.
+ from the distribution packages; the app generates per-user
+ configuration under the XDG directories and runs everything as the
+ logged-in user.
+ .
+ It maps local hostnames in /etc/hosts via a single polkit prompt and
+ provides trusted local HTTPS by installing a private CA into the
+ system trust store.

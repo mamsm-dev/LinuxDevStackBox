@@ -1,0 +1,64 @@
+.\" Manual page for LinuxDevStackBox.
+.TH LINUXDEVSTACKBOX 1 "October 2026" "0.1.25" "User Commands"
+.SH NAME
+linuxdevstackbox \- local PHP development environment for Linux
+.SH SYNOPSIS
+.B linuxdevstackbox
+.RI [ option ]
+.SH DESCRIPTION
+.B linuxdevstackbox
+is a desktop application that manages Apache, MySQL/MariaDB, PHP and
+phpMyAdmin for local PHP development. Runtimes come from the distribution
+packages; the application generates per-user configuration under the XDG
+directories (~/.config/linuxdevstackbox and
+~/.local/share/linuxdevstackbox), runs all services as the logged-in user,
+and never requires root for normal operation.
+.PP
+Apache is served from http://localhost:8080/ by default and phpMyAdmin
+from http://localhost:8080/phpmyadmin/. The MySQL/MariaDB server listens
+on 127.0.0.1:3306 with its socket and data directory under the XDG data
+root.
+.SH OPTIONS
+The graphical application takes no arguments beyond the privileged helper
+modes below, which are invoked through
+.BR pkexec (1)
+by the application itself and are not intended for direct use:
+.TP
+.B \-\-hosts\-operation add|remove <domain>
+Edit the managed /etc/hosts block for a .test hostname.
+.TP
+.B \-\-ca\-trust\-operation install|remove
+Install or remove the local HTTPS CA anchor in the system trust store.
+.TP
+.B \-\-setup\-local\-https
+Provision the local HTTPS certificates non-interactively.
+.TP
+.B \-\-https\-status
+Print the local HTTPS status as JSON.
+.TP
+.B \-\-start\-services, \-\-stop\-services
+Start or stop the managed Apache and MySQL services headlessly.
+.SH FILES
+.TP
+.I ~/.config/linuxdevstackbox
+Generated configuration (httpd.conf, my.cnf, php.ini, site records,
+HTTPS certificates).
+.TP
+.I ~/.local/share/linuxdevstackbox
+Runtime data (logs, MySQL data, www projects, backups, phpMyAdmin copy).
+Both roots can be redirected with LINUXDEVSTACKBOX_DATA_DIR.
+.TP
+.I /usr/lib/linuxdevstackbox
+Read-only application resources, including the bundled phpMyAdmin.
+.SH ENVIRONMENT
+.TP
+.B LINUXDEVSTACKBOX_DATA_DIR
+Overrides the XDG config and data roots for the application process.
+.SH DIAGNOSTICS
+Service logs are written under ~/.local/share/linuxdevstackbox/logs and
+shown on the application's Logs pages.
+.SH SEE ALSO
+.BR httpd (8),
+.BR mariadbd (8),
+.BR php (1),
+.BR pkexec (1)

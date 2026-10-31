@@ -1,0 +1,7 @@
+# Lintian overrides for the linuxdevstackbox binary package.
+#
+# The bundled phpMyAdmin (usr/lib/linuxdevstackbox/phpmyadmin) is the
+# upstream application shipped read-only inside the package; its bundled
+# JavaScript libraries are maintained upstream and must not be replaced by
+# Debian libjs-* packages without breaking the vendored application.
+linuxdevstackbox binary: embedded-javascript-library
