@@ -43,9 +43,9 @@ describe("PHP version manager", () => {
     expect([...view.host.querySelectorAll("button")].find(b => b.textContent === "Update required")?.disabled).toBe(true);
     await view.dispose();
   });
-  it("shows the resolved downloadable patch and passes the branch to installation", async () => {
+  it("shows the resolved installable patch and passes the branch to the install-instructions command", async () => {
     const view = await render([{ version: "8.5", installed: false, latest_version: "8.5.12" }]);
-    const download = [...view.host.querySelectorAll("button")].find(b => b.textContent?.includes("Download 8.5.12"))!;
+    const download = [...view.host.querySelectorAll("button")].find(b => b.textContent?.includes("Install instructions for 8.5.12"))!;
     await act(async () => download.click());
     expect(mocks.invoke).toHaveBeenCalledWith("download_php_version", { version: "8.5" });
     await view.dispose();
