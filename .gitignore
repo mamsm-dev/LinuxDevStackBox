@@ -1,5 +1,6 @@
 # Logs and runtime data only
-logs/
+/logs/
+www/logs/
 *.log
 .tmp-tauri-build.log
 npm-debug.log*
