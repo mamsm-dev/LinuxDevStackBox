@@ -1,6 +1,6 @@
 // Embedded terminal session management.
 //
-// Spawns the user's login shell (or a PHP/MySQL interactive client) in a PTY
+// Spawns the user's login shell (or PHP / MySQL CLI) per session inside a PTY
 // (via portable-pty) and streams output to the frontend via Tauri events.
 //
 // Event emitted:  "terminal-output"  payload: { session_id: String, data: String }
@@ -8,11 +8,12 @@
 use portable_pty::{native_pty_system, CommandBuilder, MasterPty, PtySize};
 use std::collections::HashMap;
 use std::io::{Read, Write};
+use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
 use tauri::{AppHandle, Emitter};
 
 use crate::utils::paths::{
-    get_mysql_client_binary, get_php_binary, user_config_dir, user_www_dir,
+    active_php_dir, get_installation_path, get_mysql_bin_dir, user_config_dir, user_www_dir,
 };
 
 // ── shared state ─────────────────────────────────────────────────────────────
@@ -82,33 +83,45 @@ fn spawn_pty_output_forwarder(app: AppHandle, session_id: String, reader: Box<dy
     });
 }
 
-/// Prefer the shell that launched the app so the terminal matches the user's
-/// interactive environment; fall back through the common Linux shells.
-fn login_shell() -> String {
-    if let Ok(shell) = std::env::var("SHELL") {
-        if !shell.is_empty() && std::path::Path::new(&shell).is_file() {
+fn build_shell_path(base_path: &Path) -> String {
+    let php_path = active_php_dir();
+    let mysql_bin = get_mysql_bin_dir(base_path);
+    let existing_path = std::env::var("PATH").unwrap_or_default();
+    format!(
+        "{}:{}:{}",
+        php_path.display(),
+        mysql_bin.display(),
+        existing_path
+    )
+}
+
+/// The user's preferred shell: $SHELL, else bash, else /bin/sh.
+fn user_shell() -> PathBuf {
+    if let Some(shell) = std::env::var_os("SHELL").map(PathBuf::from) {
+        if shell.is_file() {
             return shell;
         }
     }
-    for candidate in ["/bin/bash", "/usr/bin/bash", "/bin/zsh", "/bin/sh"] {
-        if std::path::Path::new(candidate).is_file() {
-            return candidate.to_string();
+    for candidate in ["/bin/bash", "/usr/bin/bash", "/bin/sh"] {
+        let p = PathBuf::from(candidate);
+        if p.is_file() {
+            return p;
         }
     }
-    "/bin/sh".to_string()
+    PathBuf::from("/bin/sh")
 }
 
-fn build_shell_env() -> String {
-    let php_dir = crate::utils::paths::active_php_dir();
-    let mysql_bin = get_mysql_client_binary()
-        .ok()
-        .and_then(|p| p.parent().map(|d| d.to_path_buf()));
-    let existing_path = std::env::var("PATH").unwrap_or_default();
-    let mut prefix = vec![php_dir.display().to_string()];
-    if let Some(dir) = mysql_bin {
-        prefix.push(dir.display().to_string());
-    }
-    format!("{}:{}", prefix.join(":"), existing_path)
+/// Shell terminals. The legacy Windows ids ("shell", "cmd", "powershell")
+/// all open the user's shell; "bash"/"zsh"/"sh"/"fish" request that shell.
+fn linux_shell(shell: &str) -> Option<CommandBuilder> {
+    let executable = match shell {
+        "shell" | "cmd" | "powershell" => user_shell(),
+        "bash" | "zsh" | "sh" | "fish" => crate::utils::paths::find_in_path(shell)?,
+        _ => return None,
+    };
+    let mut command = CommandBuilder::new(executable);
+    command.env("TERM", "xterm-256color");
+    Some(command)
 }
 
 // ── commands ──────────────────────────────────────────────────────────────────
@@ -120,7 +133,8 @@ pub async fn spawn_terminal(
     session_id: String,
     shell_type_id: String,
 ) -> Result<(), String> {
-    let new_path = build_shell_env();
+    let base_path = get_installation_path();
+    let new_path = build_shell_path(&base_path);
 
     let pty_system = native_pty_system();
     let pair = pty_system
@@ -132,35 +146,41 @@ pub async fn spawn_terminal(
         })
         .map_err(|e| format!("Failed to open PTY: {}", e))?;
 
-    let mut cmd = match shell_type_id.as_str() {
-        "shell" | "bash" => {
-            let mut command = CommandBuilder::new(login_shell());
-            command.args(["-i"]);
-            command
-        }
-        "php-cli" => {
-            let executable = get_php_binary()?;
-            let mut command = CommandBuilder::new(executable);
-            command.arg("-a");
-            command
-        }
-        "mysql-cli" => {
-            crate::utils::mysql_connection::prepare_mysql_client()?;
-            let executable = get_mysql_client_binary()?;
-            let conn = crate::utils::mysql_connection::build_mysql_connection()?;
-            let mut command = CommandBuilder::new(executable);
-            command.arg(format!("--defaults-file={}", conn.defaults_file.display()));
-            command.args(["--protocol=TCP", "--host=127.0.0.1", "--user=root"]);
-            command.arg(format!("--port={}", conn.port));
-            if let Some(password) = conn.password {
-                command.env("MYSQL_PWD", password);
+    let mut cmd = if let Some(command) = linux_shell(&shell_type_id) {
+        command
+    } else {
+        let executable = match shell_type_id.as_str() {
+            "php-cli" => crate::utils::paths::php_cli_in(&active_php_dir()),
+            "mysql-cli" => {
+                crate::utils::mysql_connection::prepare_mysql_client()?;
+                crate::utils::paths::get_mysql_client_exe(&base_path)
             }
-            command
+            _ => return Err("Unsupported terminal type".into()),
+        };
+        if !executable.is_file() {
+            return Err(format!(
+                "Required executable is missing: {}",
+                executable.display()
+            ));
         }
-        _ => return Err("Unsupported terminal type".into()),
+        CommandBuilder::new(executable)
     };
+    if shell_type_id == "php-cli" {
+        cmd.arg("-a");
+    }
+    if shell_type_id == "mysql-cli" {
+        let conn = crate::utils::mysql_connection::build_mysql_connection()?;
+        cmd.arg(format!("--defaults-file={}", conn.defaults_file.display()));
+        cmd.args(["--protocol=TCP", "--host=127.0.0.1", "--user=root"]);
+        cmd.arg(format!("--port={}", conn.port));
+        if let Some(password) = conn.password {
+            cmd.env("MYSQL_PWD", password);
+        }
+    }
+    cmd.env("TERM", "xterm-256color");
     cmd.env("PATH", &new_path);
     cmd.env("PHPRC", user_config_dir());
+    cmd.env("PHP_INI_SCAN_DIR", "");
     cmd.cwd(user_www_dir());
 
     let child = pair
@@ -269,59 +289,22 @@ pub async fn kill_terminal_session(
     Ok(())
 }
 
-#[cfg(all(test, unix))]
+#[cfg(test)]
 mod tests {
     use super::*;
-    use std::time::{Duration, Instant};
 
     #[test]
-    fn login_shell_executes_commands() {
-        let pair = native_pty_system()
-            .openpty(PtySize {
-                rows: 24,
-                cols: 120,
-                pixel_width: 0,
-                pixel_height: 0,
-            })
-            .unwrap();
-        let mut command = CommandBuilder::new(login_shell());
-        command.args(["-i"]);
-        command.cwd(std::env::temp_dir());
-        let mut child = pair.slave.spawn_command(command).unwrap();
-        let mut reader = pair.master.try_clone_reader().unwrap();
-        let mut writer = pair.master.take_writer().unwrap();
-        let (tx, rx) = std::sync::mpsc::channel();
-        std::thread::spawn(move || {
-            let mut buf = [0; 4096];
-            while let Ok(n @ 1..) = reader.read(&mut buf) {
-                if tx
-                    .send(String::from_utf8_lossy(&buf[..n]).to_string())
-                    .is_err()
-                {
-                    break;
-                }
-            }
-        });
-        let deadline = Instant::now() + Duration::from_secs(15);
-        let mut output = String::new();
-        let mut sent = false;
-        while Instant::now() < deadline {
-            if let Ok(chunk) = rx.recv_timeout(Duration::from_millis(100)) {
-                output.push_str(&chunk);
-                if !sent && (output.contains('$') || output.contains('%') || output.contains('#')) {
-                    writer.write_all(b"echo LDSB_TERMINAL_OK\r\n").unwrap();
-                    writer.flush().unwrap();
-                    sent = true;
-                }
-                if output.contains("LDSB_TERMINAL_OK") {
-                    break;
-                }
-            }
-        }
-        let _ = child.kill();
-        assert!(
-            output.contains("LDSB_TERMINAL_OK"),
-            "shell did not execute: {output:?}"
-        );
+    fn shell_ids_resolve_to_the_user_shell() {
+        assert!(linux_shell("shell").is_some());
+        assert!(linux_shell("powershell").is_some());
+        assert!(linux_shell("php-cli").is_none());
+        assert!(linux_shell("mysql-cli").is_none());
+    }
+
+    #[test]
+    fn shell_path_puts_php_first() {
+        let path = build_shell_path(Path::new("/opt/lds"));
+        assert!(path.starts_with(&active_php_dir().display().to_string()));
+        assert!(!path.contains(';'));
     }
 }

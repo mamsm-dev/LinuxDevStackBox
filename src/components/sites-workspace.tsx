@@ -354,7 +354,7 @@ export function SitesWorkspace({ advanced = false }: { advanced?: boolean }) {
                     if (
                       window.confirm(
                         text(
-                          `Disconnect ${site.domain}? Project files are kept. Your desktop may request permission to remove its hostname.`,
+                          `Disconnect ${site.domain}? Project files are kept. Authentication (pkexec) may be requested to remove its hostname from /etc/hosts.`,
                           `${site.domain} डिस्कनेक्ट करें? प्रोजेक्ट फ़ाइलें सुरक्षित रहेंगी।`,
                         ),
                       )
@@ -597,8 +597,8 @@ export function SitesWorkspace({ advanced = false }: { advanced?: boolean }) {
                 />
                 <p className="mt-1 text-xs text-muted-foreground">
                   {text(
-                    "Comma-separated .test names. Each mapping may request administrator permission.",
-                    "अल्पविराम से अलग .test नाम। व्यवस्थापक अनुमति माँगी जा सकती है।",
+                    "Comma-separated .test names. Each mapping may request authentication (pkexec).",
+                    "अल्पविराम से अलग .test नाम। प्रमाणीकरण (pkexec) माँग सकता है।",
                   )}
                 </p>
               </details>
@@ -625,8 +625,8 @@ export function SitesWorkspace({ advanced = false }: { advanced?: boolean }) {
                   : ""}
                 /<br />
                 {text(
-                  "Your desktop may request administrator permission (polkit) to map the hostname. Apache restarts if running.",
-                  "होस्टनाम के लिए व्यवस्थापक अनुमति (polkit) माँगी जा सकती है। चल रहा Apache पुनः शुरू होगा।",
+                  "Authentication (pkexec) may be requested to edit /etc/hosts. Apache restarts if running.",
+                  "होस्टनाम के लिए प्रमाणीकरण (pkexec) माँग सकता है। चल रहा Apache पुनः शुरू होगा।",
                 )}
               </p>
             </fieldset>

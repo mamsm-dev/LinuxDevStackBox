@@ -12,7 +12,7 @@ use tauri::Emitter;
 use zip::write::SimpleFileOptions;
 
 use crate::utils::mysql_connection::{mysqldump_command, mysql_command, prepare_mysql_client};
-use crate::utils::paths::{user_backups_dir, user_config_dir, user_www_dir};
+use crate::utils::paths::{get_installation_path, get_mysqld_exe, user_backups_dir, user_config_dir, user_www_dir};
 use crate::utils::process::is_our_process_running;
 
 // -------------------------------------------------------------------------
@@ -84,6 +84,7 @@ fn collect_files(dir: &Path, prefix: &str, out: &mut Vec<(String, PathBuf)>) -> 
         // not recoverable configuration, and must be skipped before opening it.
         if is_operation_lock(&zip_name) { continue; }
         let meta = std::fs::symlink_metadata(&path).map_err(|e| e.to_string())?;
+        if meta.file_type().is_symlink() { return Err(format!("Linked folder/file requires a separate backup: {}", path.display())); }
         // Private local CAs are machine/account credentials, not portable project data.
         if zip_name == "config/ssl" || zip_name == "config/https" { continue; }
         if meta.is_dir() { collect_files(&path, &zip_name, out)?; }
@@ -143,7 +144,7 @@ pub async fn create_full_backup(
         return Err("Invalid timestamp".to_string());
     }
 
-    // Colons in timestamps are replaced with hyphens for friendlier filenames.
+    // Replace colons (invalid in filenames on Windows) with hyphens
     let safe_ts = timestamp.replace(':', "-");
     let filename = format!("linuxdevstackbox-backup-{}.zip", safe_ts);
     let final_path = full_backups_dir().join(&filename);
@@ -178,9 +179,10 @@ pub async fn create_full_backup(
 
     // --- mysql/all-databases.sql ----------------------------------------
     emit(&app, "mysql", 70, "Backing up MySQL databases...");
-    let mysqld = crate::utils::paths::user_config_dir().join("my.cnf");
+    let base = get_installation_path();
+    let mysqld = get_mysqld_exe(&base);
     let mut mysql_included = false;
-    if is_our_process_running("mysqld", &mysqld) || is_our_process_running("mariadbd", &mysqld) {
+    if is_our_process_running(&mysqld.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default(), &mysqld) {
         prepare_mysql_client()?;
         let sql_path = zip_path.with_extension("sql.partial");
         let _sql_guard = PartialFileGuard(sql_path.clone());
@@ -196,7 +198,7 @@ pub async fn create_full_backup(
         contents.push("mysql".to_string());
         mysql_included = true;
     } else {
-        eprintln!("DevStackBox MySQL is not running, skipping MySQL backup");
+        eprintln!("LinuxDevStackBox MySQL is not running, skipping MySQL backup");
     }
 
     // --- manifest.json ---------------------------------------------------
@@ -414,7 +416,7 @@ pub async fn delete_full_backup(path: String) -> Result<(), String> {
     Ok(())
 }
 
-/// Open the full backups folder in the system file manager.
+/// Open the full backups folder in the desktop file manager.
 #[tauri::command]
 pub async fn open_backups_folder() -> Result<(), String> {
     let dir = full_backups_dir();

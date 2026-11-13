@@ -55,7 +55,7 @@ export interface PHPVersionInfo {
   security_update_required?: boolean;
   end_of_life?: boolean;
   release_error?: string | null;
-  status: "installed" | "available" | "downloading" | "missing";
+  status: "installed" | "available" | "downloading";
   path: string;
   is_active: boolean;
   installed: boolean;

@@ -8,13 +8,15 @@ use serde::Serialize;
 
 use crate::utils::paths::{get_installation_path, user_www_dir};
 
-const XAMPP_CANDIDATES: &[&str] = &["/opt/lampp"];
+// XAMPP for Linux installs into /opt/lampp (older packages: /opt/xampp).
+const XAMPP_CANDIDATES: &[&str] = &["/opt/lampp", "/opt/xampp", "/usr/local/xampp"];
 
-// Keep the first display path when candidates differ only in spelling.
+// Linux paths are case-sensitive; only drop exact duplicates (trailing slash
+// differences). Keep the first display path.
 fn unique_candidates<'a>(candidates: &'a [&'a str]) -> Vec<&'a str> {
     let mut seen = HashSet::new();
     candidates.iter().copied().filter(|candidate| {
-        let key = candidate.replace('/', "\\").trim_end_matches('\\').to_lowercase();
+        let key = candidate.trim_end_matches('/').to_string();
         seen.insert(key)
     }).collect()
 }
@@ -69,10 +71,10 @@ mod detection_tests {
     use super::unique_candidates;
 
     #[test]
-    fn equivalent_spelling_deduplicates_but_distinct_roots_do_not() {
+    fn deduplicates_trailing_slashes_but_preserves_distinct_installations() {
         assert_eq!(
-            unique_candidates(&["/opt/lampp", "/opt/lampp/"]),
-            vec!["/opt/lampp"]
+            unique_candidates(&["/opt/lampp", "/opt/lampp/", "/opt/xampp"]),
+            vec!["/opt/lampp", "/opt/xampp"]
         );
     }
 }
@@ -88,7 +90,12 @@ fn copy_tree(src: &Path, dest: &Path) -> Result<u32, String> {
         let name = entry.file_name();
         let from = entry.path();
         let to = dest.join(&name);
-        if from.is_dir() {
+        let file_type = entry.file_type().map_err(|e| e.to_string())?;
+        // Never follow symlinks (avoids loops and copying files from outside the tree).
+        if file_type.is_symlink() {
+            continue;
+        }
+        if file_type.is_dir() {
             copied = copied.saturating_add(copy_tree(&from, &to)?);
         } else {
             if to.exists() {

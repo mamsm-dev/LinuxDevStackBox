@@ -3,12 +3,11 @@
  *
  * Registry of all shell types available in the universal terminal.
  *
- * How spawning works:
- *  The Rust backend spawns the user's login shell ($SHELL) as the host
- *  process, with the directories holding the distribution php and mysql
- *  clients prepended to PATH. `initialCommand` is a string written to the
- *  shell's stdin immediately after spawn - equivalent to the user typing it
- *  and pressing Enter. null means a plain shell prompt.
+ * How `initialCommand` works:
+ *  The Rust backend spawns the user's login shell (bash/$SHELL, with the active
+ *  PHP runtime and the MySQL/MariaDB bin dir prepended to PATH). `initialCommand`
+ *  is a string written to the shell's stdin immediately after spawn - equivalent
+ *  to the user typing it and pressing Enter. null means a plain shell prompt.
  *
  */
 
@@ -20,7 +19,7 @@ import {
 } from "lucide-react";
 
 export interface ShellType {
-  id: "shell" | "bash" | "php-cli" | "mysql-cli";
+  id: "shell" | "powershell" | "cmd" | "php-cli" | "mysql-cli";
   label: string;
   icon: LucideIcon;
   /**
@@ -33,15 +32,9 @@ export interface ShellType {
 export const SHELL_TYPES: ShellType[] = [
   {
     id: "shell",
-    label: "Shell",
-    icon: SquareTerminal,
-    initialCommand: null,
-  },
-  {
-    id: "bash",
     label: "Bash",
     icon: SquareTerminal,
-    initialCommand: null, // plain login shell - identical to "shell" but semantically distinct
+    initialCommand: null,
   },
   {
     id: "php-cli",

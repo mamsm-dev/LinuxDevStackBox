@@ -15,44 +15,38 @@ Thank you for your interest in contributing to LinuxDevStackBox.
 
 LinuxDevStackBox is built with:
 
-- **Backend**: Tauri 2 (Rust), driving distribution Apache/MariaDB/PHP packages
+- **Backend**: Tauri (Rust)
 - **Frontend**: Vite + React + TypeScript
 - **Styling**: Tailwind CSS + shadcn/ui
 - **Animations**: Framer Motion
 - **i18n**: i18next (English & Hindi)
 
-Linux is the only supported platform. Development happens on Arch Linux; CI verifies on Ubuntu.
-
 ## Development Setup
 
 ### Prerequisites
 
-- Node.js 20+ and npm (the app tracks package-lock.json)
-- Current stable Rust
-- The WebKitGTK libraries of your distribution, e.g. `webkit2gtk-4.1` on Arch, `libwebkit2gtk-4.1-dev` on Debian, `webkit2gtk4.1-devel` on Fedora
-- The runtime stack for testing: `apache`/`apache2`/`httpd`, `mariadb`/`mariadb-server`, `php`, `php-cgi`
+- Node.js 24 LTS and npm (the app tracks package-lock.json)
+- Current stable Rust plus the Tauri Linux prerequisites (webkit2gtk-4.1, libayatana-appindicator, librsvg2, patchelf)
+- A current Linux distribution (Debian/Ubuntu or Fedora recommended)
 
 ### Installation
 
 ```bash
-git clone https://github.com/mamsm-dev/LinuxDevStackBox.git
+git clone https://github.com/DevStackBox/DevStackBox.git
 cd LinuxDevStackBox
 npm ci
-npm run tauri:dev
+pnpm tauri dev
 ```
 
 ### Build for Production
 
+Configure the private updater signing key and follow [the release runbook](docs/development/release-runbook.mdx).
+
 ```bash
-npm run build:release     # verifies inputs, builds .deb and .rpm
-# Arch package:
-git archive --prefix=linuxdevstackbox/ -o packaging/arch/linuxdevstackbox-$(version).tar.gz HEAD
-cd packaging/arch && makepkg -f
+npm run build:release
 ```
 
-See [the release runbook](docs/development/release-runbook.mdx).
-
-## Project Structure
+## 📂 Project Structure
 
 ```
 LinuxDevStackBox/
@@ -64,18 +58,16 @@ LinuxDevStackBox/
 ├── src-tauri/        # Rust backend
 │   ├── src/          # Tauri commands & service management
 │   └── capabilities/ # Tauri permissions
-├── config/           # Server config templates (httpd.conf, my.cnf, etc.)
+├── config/           # Server config files (httpd.conf, my.cnf, etc.)
 ├── locales/          # i18next translations (en.json, hi.json)
-├── packaging/        # Arch PKGBUILD, phpMyAdmin staging policy
-├── docs/             # MDX documentation
 └── scripts/          # Build & preparation scripts
 ```
 
 ## Development Guidelines
 
-Documentation lives in `docs/` as MDX. When you add or rename a page, update `docs/navigation.ts` in the same pull request.
+Documentation lives in `docs/` as MDX. When you add or rename a page, update `docs/navigation.ts` in the same pull request. The website at [devstackbox.com/docs](https://www.devstackbox.com/docs) is built from this folder by [LinuxDevStackBox-Website](https://github.com/DevStackBox/DevStackBox-Website).
 
-Follow [docs/development/coding-standards.mdx](docs/development/coding-standards.mdx) for user-facing copy.
+Follow [docs/development/coding-standards.mdx](docs/development/coding-standards.mdx) for user-facing copy (also published on the website).
 
 ### UI/UX Rules
 
@@ -83,32 +75,34 @@ Follow [docs/development/coding-standards.mdx](docs/development/coding-standards
 - **Dark/light mode required** - All components must support both themes
 - **Use Framer Motion** for animations (not CSS keyframes)
 - **Responsive design** - Test on different screen sizes
-- **KDE Plasma and GNOME** are the reference desktops
 
 ### Code Style
 
 - **TypeScript**: Use strict typing, no `any` unless necessary
-- **Rust**: Follow standard Rust conventions, use `cargo fmt`; clippy must stay clean (`-D warnings`)
-- **Platform code**: never reintroduce Windows-specific code; services run as the invoking user and elevation uses pkexec for the two whitelisted operations only
+- **Rust**: Follow standard Rust conventions, use `cargo fmt`
 - **Components**: Keep components small and focused
 - **i18n**: All user-facing text must use `t()` from i18next
 
-### Key checks before pushing
+### Copilot Best Practices
 
-```bash
-npm test                                  # vitest
-npx tsc --noEmit                          # typecheck
-cargo test --manifest-path src-tauri/Cargo.toml --lib
-cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets -- -D warnings
-node scripts/validate-docs.mjs
-```
+See [.github/copilot-instructions.md](.github/copilot-instructions.md) for detailed GitHub Copilot usage guidelines.
 
-## Submitting Changes
+## 🔧 Key Features to Implement
+
+Priority features (see README.md for full list):
+
+1. **Apache Server Management** (High Priority)
+2. **Logs Viewer** with real-time updates
+3. **Config Editor** with Monaco
+4. **Auto-Updater** integration
+5. **Database Backup/Restore**
+
+## 📤 Submitting Changes
 
 1. **Fork** the repository
 2. **Create a branch**: `git checkout -b feature/your-feature-name`
 3. **Make your changes** following the guidelines above
-4. **Test thoroughly** on your distribution
+4. **Test thoroughly** on Linux
 5. **Commit**: Use clear, descriptive commit messages
 6. **Push**: `git push origin feature/your-feature-name`
 7. **Create a Pull Request** with detailed description
@@ -120,15 +114,15 @@ node scripts/validate-docs.mjs
 - Ensure all tests pass
 - Update documentation if needed
 
-## Reporting Issues
+## 🐛 Reporting Issues
 
-Use [GitHub Issues](https://github.com/mamsm-dev/LinuxDevStackBox/issues) to report:
+Use [GitHub Issues](https://github.com/DevStackBox/DevStackBox/issues) to report:
 
 - Bugs
 - Feature requests
 - Documentation improvements
 
-For security vulnerabilities, follow [SECURITY.md](SECURITY.md) - do not open a public issue.
+For security vulnerabilities, follow [SECURITY.md](SECURITY.md) and email **hello@devstackbox.com** - do not open a public issue.
 
 ### Bug Report Template
 
@@ -136,8 +130,8 @@ For security vulnerabilities, follow [SECURITY.md](SECURITY.md) - do not open a 
 **Environment:**
 
 - LinuxDevStackBox Version:
-- Distribution and desktop (e.g. Arch Linux, KDE Plasma):
-- Installation Method: pacman / deb / rpm; include whether this was a clean install or upgrade
+- OS: Linux distribution and version
+- Installation Method: AppImage or source build; include whether this was a clean install or upgrade
 
 **Description:**
 Clear description of the bug
@@ -157,6 +151,12 @@ What actually happens
 **Screenshots:**
 If applicable
 ```
+
+## 📞 Contact
+
+- **Author**: Nomad Programmer
+- **Email**: hello@devstackbox.com
+- **GitHub**: [LinuxDevStackBox/LinuxDevStackBox](https://github.com/DevStackBox/DevStackBox)
 
 ---
 

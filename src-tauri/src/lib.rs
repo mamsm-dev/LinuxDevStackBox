@@ -31,8 +31,8 @@ use crate::commands::mysql_import::{
     restore_mysql_from_file,
 };
 use crate::commands::php::{
-    get_php_status, get_php_versions, list_php_extensions, open_php_terminal, toggle_php,
-    toggle_php_extension,
+    download_php_version, get_php_status, get_php_versions, list_php_extensions,
+    open_php_terminal, switch_php_version, toggle_php, toggle_php_extension,
 };
 use crate::commands::system::{
     check_binaries, create_directory_structure, debug_installation, debug_paths, export_diagnostics_bundle,
@@ -82,6 +82,8 @@ pub fn run() {
             start_apache,
             stop_apache,
             get_php_versions,
+            switch_php_version,
+            download_php_version,
             list_php_extensions,
             toggle_php_extension,
             toggle_mysql,
@@ -201,7 +203,11 @@ pub fn run() {
                     }
                 });
             }
-            crate::tray::setup_tray(app)?;
+            // The tray needs libayatana-appindicator at runtime; a missing
+            // library or StatusNotifier host must not prevent the app from starting.
+            if let Err(error) = crate::tray::setup_tray(app) {
+                eprintln!("System tray unavailable: {error}");
+            }
             Ok(())
         })
         .on_window_event(|window, event| {

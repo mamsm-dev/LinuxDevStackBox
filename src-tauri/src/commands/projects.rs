@@ -48,7 +48,7 @@ fn compare_configuration(name: &str, actual: &str, expected: &str) -> Option<Str
 fn configuration_warnings(sites: &[super::vhosts::VhostEntry]) -> Vec<String> {
     let config = crate::utils::paths::user_config_dir();
     let mut expected_http =
-        String::from("# Managed DevStackBox sites; localhost is defined in httpd.conf\n");
+        String::from("# Managed LinuxDevStackBox sites; localhost is defined in httpd.conf\n");
     for entry in sites.iter().filter(|s| s.enabled) {
         match super::vhosts::render_site(entry, false) {
             Ok(rendered) => expected_http.push_str(&rendered),
@@ -147,7 +147,7 @@ mod tests {
     fn detects_orphan_generated_sites_and_path_changes() {
         assert!(compare_configuration("ssl.conf", "ServerName a.test", "").is_some());
         assert!(
-            compare_configuration("vhosts.conf", "DocumentRoot C:/a", "DocumentRoot C:/b")
+            compare_configuration("vhosts.conf", "DocumentRoot /srv/a", "DocumentRoot /srv/b")
                 .is_some()
         );
         assert!(compare_configuration("vhosts.conf", "same\r\n", "same\n").is_none());
@@ -193,16 +193,11 @@ pub async fn choose_project_folder() -> Result<Option<String>, String> {
 #[tauri::command]
 pub async fn create_project_folder(name: String) -> Result<String, String> {
     let name = name.trim();
-    let reserved = [
-        "con", "prn", "aux", "nul", "com1", "com2", "com3", "com4", "com5", "com6", "com7", "com8",
-        "com9", "lpt1", "lpt2", "lpt3", "lpt4", "lpt5", "lpt6", "lpt7", "lpt8", "lpt9",
-    ];
     if name.is_empty()
         || name.len() > 63
         || !name
             .bytes()
             .all(|c| c.is_ascii_alphanumeric() || c == b'-' || c == b'_')
-        || reserved.contains(&name.to_ascii_lowercase().as_str())
     {
         return Err("Use a project name with letters, numbers, hyphens or underscores.".into());
     }
@@ -212,7 +207,7 @@ pub async fn create_project_folder(name: String) -> Result<String, String> {
     })?;
     fs::write(
         path.join("index.php"),
-        "<?php echo 'Your DevStackBox project is ready.';\n",
+        "<?php echo 'Your LinuxDevStackBox project is ready.';\n",
     )
     .map_err(|e| e.to_string())?;
     Ok(path.to_string_lossy().into_owned())

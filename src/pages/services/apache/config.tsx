@@ -7,7 +7,7 @@ export function ApacheConfigPage() {
     <WorkspaceConfigEditor
       service="apache"
       title={t("apache.config.title", "Apache Configuration")}
-      filename="~/.config/linuxdevstackbox/httpd.conf"
+      filename="~/.local/share/linuxdevstackbox/config/httpd.conf"
       language="apacheconf"
     />
   );

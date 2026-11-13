@@ -63,7 +63,7 @@ export function SettingsXamppImportPage() {
           Scan again
         </Button>
         {detections.length === 0 ? (
-          <p className="text-sm text-muted-foreground">No XAMPP folder found at C:\xampp.</p>
+          <p className="text-sm text-muted-foreground">No XAMPP/LAMPP folder found at /opt/lampp.</p>
         ) : (
           detections.map((item) => (
             <div key={item.path} className="rounded-lg border border-border p-4">

@@ -1,8 +1,8 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "LinuxDevStackBox",
-  "version": "0.1.26",
-  "identifier": "com.mam.linuxdevstackbox",
+  "version": "0.1.22",
+  "identifier": "com.srapsware.linuxdevstackbox",
   "build": {
     "beforeDevCommand": "npm run dev",
     "beforeBuildCommand": "npm run build",
@@ -31,10 +31,9 @@
     "active": true,
     "createUpdaterArtifacts": false,
     "targets": [
-      "deb",
-      "rpm"
+      "appimage"
     ],
-    "publisher": "MAM",
+    "publisher": "Nomad Programmer",
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",
@@ -42,34 +41,18 @@
       "icons/icon.png"
     ],
     "resources": {
-      "../packaging/phpmyadmin-runtime": "phpmyadmin"
+      "../packaging/phpmyadmin-runtime": "phpmyadmin",
+      "../www": "www"
     },
     "externalBin": [],
-    "copyright": "\u00a9 2026 MAM",
-    "category": "Development",
+    "copyright": "© 2026 Nomad Programmer",
+    "category": "DeveloperTool",
     "shortDescription": "Local PHP development environment for Linux",
-    "longDescription": "LinuxDevStackBox is a local PHP development environment for Linux: it manages Apache, MySQL/MariaDB, PHP and phpMyAdmin from distribution packages with per-user configuration, virtual hosts, trusted local HTTPS, database tooling and an integrated terminal.",
+    "longDescription": "Apache, MySQL/MariaDB, phpMyAdmin and PHP 8.2-8.5 manager for Linux. Linux port of DevStackBox.",
     "linux": {
-      "deb": {
-        "depends": [
-          "apache2",
-          "mariadb-server",
-          "php",
-          "php-cgi",
-          "libnss3-tools",
-          "openssl",
-          "policykit-1"
-        ]
-      },
-      "rpm": {
-        "depends": [
-          "httpd",
-          "mariadb-server",
-          "php",
-          "php-cgi",
-          "openssl",
-          "polkit"
-        ]
+      "appimage": {
+        "bundleMediaFramework": false,
+        "files": {}
       }
     }
   }

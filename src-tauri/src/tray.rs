@@ -5,6 +5,11 @@
 // via MenuItem::set_text, and spawns a 5-second background poller that keeps
 // the labels and tooltip in sync with the actual service state.
 //
+// Linux note: the tray is an AppIndicator/StatusNotifier icon
+// (libayatana-appindicator). Such icons do not deliver click events, so the
+// menu is the primary interface; the click handler below only matters on
+// desktops that do emit them. Tooltips may be ignored by the desktop shell.
+//
 // Menu layout:
 //   Show LinuxDevStackBox
 //   ─────────────────
@@ -69,7 +74,7 @@ pub async fn refresh_tray_status(app: &AppHandle) {
     let apache = get_apache_status().await.unwrap_or(ServiceInfo {
         running: false,
         pid: None,
-        port: Some(80),
+        port: Some(apache_listen_port()),
         version: None,
     });
     let mysql = get_mysql_status().await.unwrap_or(ServiceInfo {
@@ -116,7 +121,7 @@ pub async fn refresh_tray_status(app: &AppHandle) {
 
 fn open_www_folder(app: &AppHandle) {
     let www = user_www_dir();
-    // Ensure the directory exists so Explorer doesn't error
+    // Ensure the directory exists so the file manager doesn't error
     let _ = std::fs::create_dir_all(&www);
     let _ = app.opener().open_path(www.to_string_lossy().as_ref(), None::<&str>);
 }
@@ -184,10 +189,15 @@ pub fn setup_tray(app: &mut App) -> Result<(), Box<dyn std::error::Error>> {
 
     let app_handle = app.handle().clone();
 
+    let icon = app
+        .default_window_icon()
+        .cloned()
+        .ok_or("No default window icon available for the tray")?;
+
     let _tray = TrayIconBuilder::with_id("main")
         .menu(&menu)
         .tooltip("LinuxDevStackBox - PHP Development Environment")
-        .icon(app.default_window_icon().unwrap().clone())
+        .icon(icon)
         .on_menu_event(move |_app, event| {
             let app = _app.clone();
             match event.id().as_ref() {

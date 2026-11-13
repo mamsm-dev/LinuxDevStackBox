@@ -11,19 +11,18 @@ LinuxDevStackBox runs on your computer. Your projects and databases stay local.
 ## Network use
 
 | When | Destination | Why |
-| ---- | ----------- | ---- |
-| Manual check or enabled automatic update checks | GitHub Releases (`latest.json` of this repository) | Show latest published version |
-| You open the update dialog | GitHub Releases page | Point you at the package-manager upgrade |
-| Normal use | None | The stack runs offline |
+| ---- | ----------- | --- |
+| Manual check or enabled automatic update checks | GitHub Releases API | Show latest version |
+| You install an update | GitHub release downloads | Download the update |
+| Normal use | None | Stack runs offline |
 
 ## Data locations
 
 | Data | Location |
 | ---- | -------- |
-| Web projects | `~/.local/share/linuxdevstackbox/www` and folders you connect |
-| Configuration, certificates | `~/.config/linuxdevstackbox` |
-| Logs, MySQL data, backups | `~/.local/share/linuxdevstackbox` |
+| Web projects | `~/LinuxDevStackBox/www` |
+| Config, logs, MySQL data | `~/.local/share/linuxdevstackbox/` |
 
 ## Contact
 
-https://github.com/mamsm-dev/LinuxDevStackBox/issues
+hello@devstackbox.com

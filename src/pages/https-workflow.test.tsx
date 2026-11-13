@@ -78,7 +78,7 @@ describe("local site health", () => {
       command === "list_vhosts"
         ? []
         : command === "list_www_projects"
-          ? [{ name: "shop", path: "C:/linuxdevstackbox/www/shop" }]
+          ? [{ name: "shop", path: "/home/user/LinuxDevStackBox/www/shop" }]
           : command === "get_site_configuration_warnings"
             ? []
             : command === "get_hosts_entries"

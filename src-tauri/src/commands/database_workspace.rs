@@ -207,7 +207,7 @@ fn validate_input(source: &str) -> Result<PathBuf, String> {
         .iter()
         .any(|ext| lower.ends_with(ext))
     {
-        return Err("Choose SQL, SQL.GZ or a DevStackBox ZIP package".into());
+        return Err("Choose SQL, SQL.GZ or a LinuxDevStackBox ZIP package".into());
     }
     fs::canonicalize(path).map_err(|e| e.to_string())
 }
@@ -395,7 +395,7 @@ fn mysql_failure_summary(diagnostic: &[u8]) -> String {
             .and_then(|value| value.parse::<u64>().ok());
         let location = line_number.map(|n| format!(" at SQL line {n}")).unwrap_or_default();
         let guidance = match code {
-            1050 => "A table already exists in the target database. Import into a new, empty database, or explicitly prepare a replacement restore after backing up existing data. DevStackBox does not automatically delete existing tables.",
+            1050 => "A table already exists in the target database. Import into a new, empty database, or explicitly prepare a replacement restore after backing up existing data. LinuxDevStackBox does not automatically delete existing tables.",
             1062 => "A duplicate key conflicts with existing data. Use an empty database for a full dump, or resolve the conflicting data before retrying.",
             1044 | 1045 | 1142 | 1227 => "The MySQL account lacks access or a required privilege. Check saved credentials and permissions.",
             1049 => "A referenced database does not exist. Check the initial target and USE statements in the dump.",
@@ -545,7 +545,7 @@ fn export_item(
         "--single-transaction",
         "--quick",
         "--hex-blob",
-        "--set-gtid-purged=OFF",
+        "--loose-set-gtid-purged=OFF",
     ]);
     if r.content != "data" {
         command.args(["--routines", "--events", "--triggers"]);
@@ -762,11 +762,11 @@ fn unpack_archive(path: &Path, temp: &Path, cancel: &AtomicBool) -> Result<ZipIm
             return Err("Package exceeds expansion limits".into());
         }
     }
-    // Ordinary backups have no DevStackBox metadata. Accept exactly one flat SQL
+    // Ordinary backups have no LinuxDevStackBox metadata. Accept exactly one flat SQL
     // entry; never guess the order or database mapping of multiple SQL files.
     if !names.contains("manifest.json") {
         if zip.len() != 1 {
-            return Err("A ZIP without a DevStackBox manifest must contain exactly one SQL file at its root. Extract multiple SQL files and review them separately.".into());
+            return Err("A ZIP without a LinuxDevStackBox manifest must contain exactly one SQL file at its root. Extract multiple SQL files and review them separately.".into());
         }
         let entry = zip.by_index(0).map_err(|e| e.to_string())?;
         let expected = entry.size();
@@ -779,7 +779,7 @@ fn unpack_archive(path: &Path, temp: &Path, cancel: &AtomicBool) -> Result<ZipIm
     }
     let mut manifest_bytes = Vec::new();
     zip.by_name("manifest.json")
-        .map_err(|_| "Missing DevStackBox manifest")?
+        .map_err(|_| "Missing LinuxDevStackBox manifest")?
         .take(1_000_001)
         .read_to_end(&mut manifest_bytes)
         .map_err(|e| e.to_string())?;
@@ -787,7 +787,7 @@ fn unpack_archive(path: &Path, temp: &Path, cancel: &AtomicBool) -> Result<ZipIm
         return Err("Manifest too large".into());
     }
     let mut manifest: Manifest =
-        serde_json::from_slice(&manifest_bytes).map_err(|_| "Invalid DevStackBox manifest")?;
+        serde_json::from_slice(&manifest_bytes).map_err(|_| "Invalid LinuxDevStackBox manifest")?;
     if manifest.version != 1
         || manifest.databases.is_empty()
         || manifest.databases.len() + 1 != zip.len()
@@ -827,7 +827,7 @@ fn unpack_archive(path: &Path, temp: &Path, cancel: &AtomicBool) -> Result<ZipIm
 fn unpack(path: &Path, temp: &Path, cancel: &AtomicBool) -> Result<Vec<BackupRecord>, String> {
     match unpack_archive(path, temp, cancel)? {
         ZipImport::Package(records) => Ok(records),
-        ZipImport::Sql(_) => Err("Expected a DevStackBox package".into()),
+        ZipImport::Sql(_) => Err("Expected a LinuxDevStackBox package".into()),
     }
 }
 fn import_item(
@@ -894,7 +894,7 @@ fn import_sql(
         run_mysql_query(&format!("CREATE DATABASE IF NOT EXISTS `{db}`;"))?;
         cmd.arg(format!("--database={db}"));
     }
-    cmd.arg("--binary-mode")
+    cmd.arg("--loose-binary-mode")
         .stdin(Stdio::from(File::open(path).map_err(|e| e.to_string())?));
     run_process(cmd, None, id, index, cancel)
 }
@@ -1085,8 +1085,10 @@ const PRIVILEGES: &[&str] = &[
 ];
 fn database_grant_scope(database: &str) -> Result<String, String> {
     // Partial revokes can change global access; preserve that advanced policy.
-    if run_mysql_query("SELECT @@GLOBAL.partial_revokes;")?.trim() != "0" {
-        return Err("This server uses partial revokes. Manage permissions in phpMyAdmin; DevStackBox will not change global restrictions.".into());
+    // MariaDB has no `partial_revokes` variable (query fails): nothing to preserve there.
+    let partial_revokes = run_mysql_query("SELECT @@GLOBAL.partial_revokes;").unwrap_or_else(|_| "0".into());
+    if partial_revokes.trim() != "0" {
+        return Err("This server uses partial revokes. Manage permissions in phpMyAdmin; LinuxDevStackBox will not change global restrictions.".into());
     }
     Ok(database.replace('_', "\\_").replace('%', "\\%"))
 }
@@ -1260,12 +1262,12 @@ mod tests {
     }
 
     #[test]
-    #[ignore = "Requires scripts/test-database-workspace.ps1 disposable MySQL profile"]
+    #[ignore = "Requires scripts/test-database-workspace.sh disposable MySQL profile"]
     fn native_external_zip_import() {
         let root = crate::utils::paths::get_user_data_root();
         assert!(root.join("database-workspace-test-profile").is_file());
         assert_ne!(crate::utils::config_ports::mysql_port(), 3306);
-        let source = std::env::var("DEVSTACKBOX_TEST_SQL_ZIP").expect("Explicit test ZIP required");
+        let source = std::env::var("LINUXDEVSTACKBOX_TEST_SQL_ZIP").expect("Explicit test ZIP required");
         prepare_mysql_client().unwrap();
         let preview = tauri::async_runtime::block_on(inspect_database_files(vec![source.clone()])).unwrap();
         assert_eq!(preview[0]["kind"], "sql-zip");
@@ -1284,7 +1286,7 @@ mod tests {
         assert!(count.trim().parse::<usize>().unwrap() > 0);
     }
     #[test]
-    #[ignore = "Requires scripts/test-database-workspace.ps1 disposable MySQL profile"]
+    #[ignore = "Requires scripts/test-database-workspace.sh disposable MySQL profile"]
     fn native_workspace_round_trip() {
         let root = crate::utils::paths::get_user_data_root();
         assert!(

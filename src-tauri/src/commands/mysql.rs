@@ -1,9 +1,4 @@
-// MySQL/MariaDB service commands.
-//
-// The distribution server is used in place of a bundled MySQL: MariaDB is
-// initialized with `mariadb-install-db` and MySQL with
-// `mysqld --initialize-insecure`. Both run from the user's XDG data dir with
-// a generated my.cnf and bind to loopback only.
+// MySQL service commands.
 
 use serde_json;
 use std::time::Duration;
@@ -18,23 +13,46 @@ use crate::utils::mysql_connection::{
 use crate::utils::mysql_credentials::write_stored_root_password;
 use crate::utils::mysql_sql::{escape_mysql_string_literal, quote_mysql_user_host, validate_mysql_host};
 use crate::utils::paths::{
-    get_mysqld_binary, get_mysql_install_binary, user_config_dir, user_logs_dir,
-    user_mysql_data_dir,
+    get_installation_path, get_mysql_install_db_exe, get_mysqld_exe, is_bundled_binary,
+    is_mariadb, to_apache_path, user_config_dir, user_logs_dir, user_mysql_data_dir,
+    user_tmp_dir,
 };
 use crate::utils::process::{
-    create_hidden_command, create_service_command, ensure_port_available, find_our_processes,
-    is_our_process_running, is_port_listening, kill_pid,
+    create_hidden_command, ensure_port_available, find_our_processes, is_our_process_running,
+    kill_pid,
 };
 
 pub const MYSQL_CONFIG_VERSION: u32 = 3;
 
-fn mysqld_marker() -> std::path::PathBuf {
-    user_config_dir().join("my.cnf")
+/// Executable file name (`mysqld` / `mariadbd`), used as the process name hint.
+fn exe_name(path: &std::path::Path) -> String {
+    path.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default()
 }
 
-fn server_running() -> bool {
-    let marker = mysqld_marker();
-    is_our_process_running("mysqld", &marker) || is_our_process_running("mariadbd", &marker)
+/// Running as root: mysqld refuses to start as root unless `--user=root` is given.
+fn running_as_root() -> bool {
+    std::fs::read_to_string("/proc/self/status")
+        .ok()
+        .and_then(|s| {
+            s.lines()
+                .find(|l| l.starts_with("Uid:"))
+                .and_then(|l| l.split_whitespace().nth(1).map(|v| v == "0"))
+        })
+        .unwrap_or(false)
+}
+
+fn mysqld_exe_path() -> std::path::PathBuf {
+    let base = get_installation_path();
+    get_mysqld_exe(&base)
+}
+
+fn is_port_listening(port: u16) -> bool {
+    use std::net::{Ipv4Addr, SocketAddrV4, TcpStream};
+    TcpStream::connect_timeout(
+        &SocketAddrV4::new(Ipv4Addr::LOCALHOST, port).into(),
+        Duration::from_millis(300),
+    )
+    .is_ok()
 }
 
 async fn wait_for_mysql_port(max_wait: Duration) -> Result<(), String> {
@@ -49,19 +67,15 @@ async fn wait_for_mysql_port(max_wait: Duration) -> Result<(), String> {
         elapsed += step;
     }
     Err(format!(
-        "MySQL started but port {} is not listening",
+        "MySQL started but port {} is not listening. Check the MySQL log in the logs folder.",
         port
     ))
 }
 
 #[tauri::command]
 pub async fn get_mysql_status() -> Result<ServiceInfo, String> {
-    let our_pids = {
-        let marker = mysqld_marker();
-        let mut pids = find_our_processes("mysqld", &marker);
-        pids.extend(find_our_processes("mariadbd", &marker));
-        pids
-    };
+    let exe = mysqld_exe_path();
+    let our_pids = find_our_processes(&exe_name(&exe), &exe);
     let running = !our_pids.is_empty();
     let pid = our_pids.first().copied();
 
@@ -74,75 +88,113 @@ pub async fn get_mysql_status() -> Result<ServiceInfo, String> {
 }
 
 async fn initialize_mysql_data() -> Result<(), String> {
+    let base_path = get_installation_path();
+
     let data_dir = user_mysql_data_dir();
-    let mysql_dir = data_dir.join("mysql");
-    if mysql_dir.exists() {
+    let mysqld = get_mysqld_exe(&base_path);
+    let config_path = user_config_dir().join("my.cnf");
+
+    // An initialised datadir always contains the `mysql` system schema directory.
+    if data_dir.join("mysql").exists() {
         return Ok(());
     }
 
-    let (install_bin, flavor) = get_mysql_install_binary()?;
-    let output = match flavor {
-        crate::utils::paths::MysqlFlavor::MariaDb => {
-            // --auth-root-authentication-method=normal gives root an empty
-            // password over TCP, matching the MySQL --initialize-insecure flow.
-            create_hidden_command(&install_bin)
-                .arg(format!("--datadir={}", data_dir.display()))
-                .arg("--auth-root-authentication-method=normal")
-                .arg("--skip-test-db")
-                .output()
-        }
-        crate::utils::paths::MysqlFlavor::MySql => {
-            create_hidden_command(&install_bin)
-                .arg("--initialize-insecure")
-                .arg(format!("--datadir={}", data_dir.display()))
-                .output()
-        }
+    // Bundled servers need an explicit basedir; a system server knows its own.
+    let basedir = if is_bundled_binary(&base_path, &mysqld) {
+        Some(base_path.join("mysql"))
+    } else {
+        None
     };
+
+    let output = if is_mariadb(&mysqld) {
+        let install_db = get_mysql_install_db_exe(&base_path).ok_or_else(|| {
+            "mariadb-install-db was not found. Install the MariaDB server package \
+             (it provides mariadb-install-db / mysql_install_db)."
+                .to_string()
+        })?;
+        let mut cmd = create_hidden_command(&install_db.to_string_lossy());
+        cmd.arg(format!("--defaults-file={}", config_path.display()))
+            .arg(format!("--datadir={}", data_dir.display()))
+            .arg("--auth-root-authentication-method=normal")
+            .arg("--skip-test-db");
+        if let Some(basedir) = &basedir {
+            cmd.arg(format!("--basedir={}", basedir.display()));
+        }
+        if running_as_root() {
+            cmd.arg("--user=root");
+        }
+        cmd.output()
+    } else {
+        // `--defaults-file` must be the first argument.
+        let mut cmd = create_hidden_command(&mysqld.to_string_lossy());
+        cmd.arg(format!("--defaults-file={}", config_path.display()))
+            .arg("--initialize-insecure")
+            .arg(format!("--datadir={}", data_dir.display()));
+        if let Some(basedir) = &basedir {
+            cmd.arg(format!("--basedir={}", basedir.display()));
+        }
+        if running_as_root() {
+            cmd.arg("--user=root");
+        }
+        cmd.output()
+    };
+
     match output {
         Ok(output) if output.status.success() => {
-            println!(
-                "{} data directory initialized successfully",
-                flavor.label()
-            );
+            println!("MySQL data directory initialized successfully");
             Ok(())
         }
         Ok(output) => Err(format!(
-            "{} initialization failed: {}",
-            flavor.label(),
-            String::from_utf8_lossy(&output.stderr)
+            "MySQL initialization failed: {}{}",
+            String::from_utf8_lossy(&output.stderr),
+            String::from_utf8_lossy(&output.stdout)
         )),
-        Err(e) => Err(format!("Failed to initialize the data directory: {}", e)),
+        Err(e) => Err(format!("Failed to initialize MySQL data directory: {}", e)),
     }
 }
 
 #[tauri::command]
 pub async fn start_mysql() -> Result<bool, String> {
-    let (mysql_path, flavor) = get_mysqld_binary()?;
+    let base_path = get_installation_path();
 
-    if server_running() { return Ok(true); }
+    let mysql_path = get_mysqld_exe(&base_path);
+    if !mysql_path.exists() {
+        return Err(format!(
+            "MySQL binary not found at {}. Install a MySQL or MariaDB server (e.g. `sudo apt install mariadb-server`) or bundle one under mysql/.",
+            mysql_path.display()
+        ));
+    }
+
+    if is_our_process_running(&exe_name(&mysql_path), &mysql_path) { return Ok(true); }
+    let config_path = user_config_dir().join("my.cnf");
     ensure_mysql_config().await?;
 
     initialize_mysql_data().await?;
 
-    let config_path = mysqld_marker();
     let port = mysql_port();
-    ensure_port_available(port, flavor.label())?;
+    ensure_port_available(port, "MySQL")?;
 
-    match create_service_command(mysql_path.as_os_str())
+    // `--defaults-file` must be the first argument.
+    let mut server = create_hidden_command(&mysql_path.to_string_lossy());
+    server
         .arg(format!("--defaults-file={}", config_path.display()))
         .stdin(std::process::Stdio::null())
         .stdout(std::process::Stdio::null())
-        .stderr(std::process::Stdio::null())
-        .spawn()
+        .stderr(std::process::Stdio::null());
+    if running_as_root() {
+        server.arg("--user=root");
+    }
+    match server.spawn()
     {
         Ok(child) => {
             let pid = child.id();
-            println!("{} started with PID: {}", flavor.label(), pid);
+            println!("MySQL started with PID: {}", pid);
             wait_for_mysql_port(Duration::from_secs(15)).await?;
             prepare_mysql_client()?;
+            let _ = pid;
             Ok(true)
         }
-        Err(e) => Err(format!("Failed to start {}: {}", flavor.label(), e)),
+        Err(e) => Err(format!("Failed to start MySQL: {}", e)),
     }
 }
 
@@ -150,15 +202,16 @@ pub async fn start_mysql() -> Result<bool, String> {
 pub async fn stop_mysql() -> Result<bool, String> {
     let _maintenance = super::log_management::MaintenanceAfterStop;
     let _lock = super::mysql_import::MYSQL_DATA_LOCK.try_lock().map_err(|_| "A database operation is running. Cancel it or wait before stopping MySQL.")?;
+    let mysql_path = mysqld_exe_path();
 
-    if !server_running() {
+    if !is_our_process_running(&exe_name(&mysql_path), &mysql_path) {
         return Ok(true);
     }
 
     if let Ok(mut admin) = crate::utils::mysql_connection::verify_mysql_datadir().and_then(|_| mysqladmin_command()) {
         let _ = admin.arg("shutdown").output();
         for _ in 0..20 {
-            if !server_running() {
+            if find_our_processes(&exe_name(&mysql_path), &mysql_path).is_empty() {
                 return Ok(true);
             }
             sleep(Duration::from_millis(500)).await;
@@ -167,9 +220,7 @@ pub async fn stop_mysql() -> Result<bool, String> {
 
     let mut errors: Vec<String> = Vec::new();
     for attempt in 0..4 {
-        let marker = mysqld_marker();
-        let mut pids = find_our_processes("mysqld", &marker);
-        pids.extend(find_our_processes("mariadbd", &marker));
+        let pids = find_our_processes(&exe_name(&mysql_path), &mysql_path);
         if pids.is_empty() {
             return Ok(true);
         }
@@ -181,18 +232,18 @@ pub async fn stop_mysql() -> Result<bool, String> {
         sleep(Duration::from_millis(if attempt == 0 { 1000 } else { 500 })).await;
     }
 
-    if !server_running() {
+    if find_our_processes(&exe_name(&mysql_path), &mysql_path).is_empty() {
         Ok(true)
     } else {
         Err(format!(
-            "LinuxDevStackBox MySQL is still running after shutdown attempts. Errors: {}",
+            "LinuxDevStackBox MySQL process still running after shutdown attempts. Errors: {}",
             errors.join("; ")
         ))
     }
 }
 
 pub async fn ensure_mysql_config() -> Result<(), String> {
-    let config_path = mysqld_marker();
+    let config_path = user_config_dir().join("my.cnf");
     if !config_path.exists() {
         return create_default_mysql_config().await;
     }
@@ -221,8 +272,8 @@ fn ensure_mysql_error_log(config_path: &std::path::Path) -> Result<(), String> {
     });
     if has_log_setting { return Ok(()); }
 
-    let log_path = user_logs_dir().join("mysql.log");
-    let directive = format!("log-error=\"{}\"", log_path.display());
+    let log_path = to_apache_path(&user_logs_dir().join("mysql.log"));
+    let directive = format!("log-error=\"{log_path}\"");
     let mut lines: Vec<String> = content.lines().map(str::to_owned).collect();
     if let Some(section) = lines.iter().position(|line| line.trim().eq_ignore_ascii_case("[mysqld]")) {
         lines.insert(section + 1, directive);
@@ -237,20 +288,29 @@ fn ensure_mysql_error_log(config_path: &std::path::Path) -> Result<(), String> {
 }
 
 pub async fn create_default_mysql_config() -> Result<(), String> {
-    let mysql_data = user_mysql_data_dir();
-    let socket = user_mysql_data_dir().join("mysql.sock");
-    let log = user_logs_dir().join("mysql.log");
+    let install_path = get_installation_path();
+    let mysqld = get_mysqld_exe(&install_path);
 
+    let mysql_data = user_mysql_data_dir();
+    let tmp = user_tmp_dir();
+    // basedir is only meaningful (and only set) for a bundled server.
+    let basedir_line = if is_bundled_binary(&install_path, &mysqld) {
+        format!("basedir={}\n", install_path.join("mysql").display())
+    } else {
+        String::new()
+    };
+
+    // `loose-` options are ignored by servers that do not know them, so the
+    // same file works for both MySQL and MariaDB.
     let config_content = format!(
-        r#"# configVersion: 3
+        r#"# configVersion: {version}
 # Managed by LinuxDevStackBox. Edits to this file are preserved across upgrades
 # unless the configVersion is bumped, which triggers a migration.
 [mysqld]
 port=3306
-datadir={}
-socket={}
-bind-address=127.0.0.1
-skip-networking=0
+{basedir_line}datadir={datadir}
+socket={socket}
+pid-file={pid}
 default-storage-engine=InnoDB
 sql-mode="STRICT_TRANS_TABLES,NO_ZERO_DATE,NO_ZERO_IN_DATE,ERROR_FOR_DIVISION_BY_ZERO"
 max_connections=100
@@ -259,25 +319,25 @@ tmp_table_size=16M
 thread_cache_size=10
 key_buffer_size=8M
 sort_buffer_size=256K
-log-error="{}"
+bind-address=127.0.0.1
+loose-mysqlx=0
+log-error="{log}"
 
 [mysql]
 default-character-set=utf8mb4
-socket={}
-port=3306
 
 [client]
 host=127.0.0.1
 protocol=TCP
 port=3306
-socket={}
 default-character-set=utf8mb4
 "#,
-        mysql_data.display(),
-        socket.display(),
-        log.display(),
-        socket.display(),
-        socket.display(),
+        version = MYSQL_CONFIG_VERSION,
+        basedir_line = basedir_line,
+        datadir = mysql_data.display(),
+        socket = tmp.join("mysql.sock").display(),
+        pid = tmp.join("mysqld.pid").display(),
+        log = to_apache_path(&user_logs_dir().join("mysql.log"))
     );
 
     let config_dir = user_config_dir();
@@ -286,9 +346,14 @@ default-character-set=utf8mb4
 }
 
 async fn get_mysql_version() -> Option<String> {
-    let (mysql_path, _) = get_mysqld_binary().ok()?;
+    let base_path = get_installation_path();
+    let mysql_path = get_mysqld_exe(&base_path);
 
-    match create_hidden_command(mysql_path.as_os_str()).arg("--version").output() {
+    if !mysql_path.exists() {
+        return None;
+    }
+
+    match create_hidden_command(&mysql_path.to_string_lossy()).arg("--version").output() {
         Ok(output) => {
             let version_str = String::from_utf8_lossy(&output.stdout);
             if let Some(start) = version_str.find("Ver ") {

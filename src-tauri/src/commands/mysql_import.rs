@@ -1,4 +1,4 @@
-// Streamed .sql restore into DevStackBox MySQL (no in-memory SQL strings).
+// Streamed .sql restore into LinuxDevStackBox MySQL (no in-memory SQL strings).
 
 use serde::Serialize;
 use std::fs::File;

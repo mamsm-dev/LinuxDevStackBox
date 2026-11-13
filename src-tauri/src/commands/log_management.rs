@@ -43,7 +43,8 @@ fn archive_dir(root: &Path) -> Result<PathBuf, String> {
     let dir = root.join("archives"); no_links(&dir)?; fs::create_dir_all(&dir).map_err(err)?; Ok(dir)
 }
 fn identity(meta: &fs::Metadata) -> String {
-    format!("{}", meta.created().unwrap_or(UNIX_EPOCH).duration_since(UNIX_EPOCH).unwrap_or_default().as_nanos())
+    use std::os::unix::fs::MetadataExt;
+    format!("{}-{}-{}", meta.dev(), meta.ino(), meta.created().unwrap_or(UNIX_EPOCH).duration_since(UNIX_EPOCH).unwrap_or_default().as_nanos())
 }
 fn prefix(file: &mut File, len: usize) -> Result<String, String> {
     file.seek(SeekFrom::Start(0)).map_err(err)?;
@@ -131,13 +132,15 @@ fn archives(root: &Path) -> Result<Vec<LogArchive>, String> {
 }
 // Conservative shutdown gate in addition to exclusive handles. Does not stop any process.
 fn writer_stopped(id: &str) -> Result<(), String> {
-    let images: &[&str] = match id { "apache" | "apache-access" => &["httpd"], "mysql" => &["mysqld", "mariadbd"], "crash" => &[], _ => &["httpd", "php", "php-cgi"] };
+    const PHP: &[&str] = &["apache2", "httpd", "php", "php-cgi", "php-cgi8.1", "php-cgi8.2", "php-cgi8.3", "php-cgi8.4", "php-cgi8.5", "php8.1", "php8.2", "php8.3", "php8.4", "php8.5"];
+    let images: &[&str] = match id { "apache" | "apache-access" => &["apache2", "httpd"], "mysql" => &["mysqld", "mariadbd"], "crash" => &[], _ => PHP };
     for image in images {
         if crate::utils::process::is_process_running(image) { return Err(format!("Stop {image} before archiving or deleting this log. PHP terminals may also be writers. No service was stopped.")); }
     }
     Ok(())
 }
 fn exclusive(path: &Path) -> Result<File, String> {
+    // Linux has no mandatory sharing modes; `writer_stopped` is the safety gate.
     let mut options = OpenOptions::new(); options.read(true).write(true);
     options.open(path).map_err(|e| format!("Log is locked or unavailable; no contents changed: {e}"))
 }
@@ -259,7 +262,7 @@ pub fn start_maintenance() {
 #[cfg(test)]
 mod tests {
     use super::*;
-    fn temp() -> PathBuf { let root = std::env::temp_dir().join(format!("dsb-logs-{}", SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_nanos())); fs::create_dir_all(&root).unwrap(); root }
+    fn temp() -> PathBuf { let root = std::env::temp_dir().join(format!("linuxdevstackbox-logs-{}", SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_nanos())); fs::create_dir_all(&root).unwrap(); root }
     #[test]
     fn clear_cursor_only_returns_new_bytes_and_detects_replacement() {
         let root = temp(); let path = root.join("error.log"); fs::write(&path, "old\n").unwrap();
@@ -300,7 +303,4 @@ mod tests {
         assert_eq!(read_chunk(&root, "apache", first.cursor, false).unwrap().text, "🦀");
         fs::write(&path, vec![b'x'; 2 * CHUNK as usize]).unwrap(); let large = read_chunk(&root, "apache", None, false).unwrap(); assert_eq!(large.text.len(), CHUNK as usize); assert!(large.skipped); fs::remove_dir_all(root).unwrap();
     }
-    // Note: exclusive-lock denial of concurrent writers is enforced on Linux
-    // by writer_stopped() (no matching live service process), not by file
-    // locking, which is advisory there.
 }

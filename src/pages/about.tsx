@@ -161,7 +161,13 @@ export function AboutPage() {
             <p className="font-semibold">
               {t("about.author", "Author")}: <a href="https://www.nomadprogrammer.in/" className="underline underline-offset-4" onClick={(event) => { event.preventDefault(); void openExternalUrl("https://www.nomadprogrammer.in/"); }}>Nomad Programmer</a>
             </p>
-            <p className="text-sm text-muted-foreground">hello@linuxdevstackbox.com</p>
+            <p className="text-sm text-muted-foreground">hello@devstackbox.com</p>
+            <p className="text-sm text-muted-foreground">
+              {t("about.linuxPort", "LinuxDevStackBox is a Linux port of DevStackBox.")}{" "}
+              <a href={URLS.githubRepo} className="underline underline-offset-4" onClick={(event) => { event.preventDefault(); void openExternalUrl(URLS.githubRepo); }}>
+                {t("about.originalProject", "Original project")}
+              </a>
+            </p>
           </div>
 
           {/* Action buttons */}

@@ -13,7 +13,7 @@ import { Button } from "@/components/ui/button";
 import { isTauri } from "@/lib/tauri";
 import { useServiceStatus } from "@/context/service-status-context";
 
-const STORAGE_KEY = "linuxdevstackbox.onboarding.completed";
+const STORAGE_KEY = "devstackbox.onboarding.completed";
 
 interface OnboardingDialogProps {
   onOpenServices: () => void;

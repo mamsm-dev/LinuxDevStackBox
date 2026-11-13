@@ -1,55 +1,43 @@
 ---
 title: "Release Process"
-description: "How LinuxDevStackBox releases are built, validated and published automatically."
+description: "Acceptance gates for the v0.1.22 release."
 icon: "Rocket"
 ---
-# Release process
+# v0.1.22 release process
 
-Releases are automated. Pushing a version tag `v<major>.<minor>.<patch>` (for example `v1.0.0`) triggers GitHub Actions, which builds the Arch, Debian and Fedora packages in their native environments, validates them, and publishes a GitHub Release with all three packages and a `SHA256SUMS` file. The exact commands are in the [release runbook](./release-runbook).
+The source version is 0.1.22. Installer generation, installed qualification and publication are separate steps. [Release runbook](./release-runbook) contains the exact commands.
 
-## Supported distributions and package formats
+## 1. Review source and versions
 
-| Distribution family | Package | Built in |
-| ------------------- | ------- | -------- |
-| Arch Linux and derivatives | `.pkg.tar.zst` (from [packaging/arch/PKGBUILD](https://github.com/mamsm-dev/LinuxDevStackBox/blob/main/packaging/arch/PKGBUILD)) | `archlinux:base-devel` container with `makepkg` |
-| Debian and derivatives | `.deb` (from [packaging/debian](https://github.com/mamsm-dev/LinuxDevStackBox/blob/main/packaging/debian/control)) | Ubuntu 24.04 runner with `dpkg-buildpackage` |
-| Fedora and RPM derivatives | `.rpm` (from [packaging/fedora/linuxdevstackbox.spec](https://github.com/mamsm-dev/LinuxDevStackBox/blob/main/packaging/fedora/linuxdevstackbox.spec)) | `fedora:latest` container with `rpmbuild` |
-| Any x86_64 Linux (portable bundle) | `.AppImage` (Tauri bundler) | Ubuntu 24.04 runner |
+- Review the app and website changes and the changelog.
+- Match package.json, src-tauri/Cargo.toml and src-tauri/tauri.conf.json at 0.1.22; synchronize app entries in both lockfiles.
+- Run npm run check, Rust unit tests and both Apache regression modes.
+- Preserve historical release notes and hashes. Generated download manifests stay associated with their original assets until finalization.
 
-Snap and Flatpak are not produced. Windows is not supported. Every release also ships a `SHA256SUMS` file covering all four assets.
+## 2. Build the signed installer
 
-## Pipeline overview
+Use npm run build:release with the private signing key configured as described in the runbook. NSIS is the only configured target. Updater signing does not imply Windows Authenticode signing. Never bypass a failed signature check.
 
-Three workflows live in `.github/workflows/`:
+## 3. Finalize from the exact artifact
 
-- **`ci.yml`** — runs on every push to `main` and every pull request: frontend build and tests, Rust tests and clippy, packaging metadata consistency, Debian changelog/control parsing, RPM spec parsing and PKGBUILD source-info generation. It never publishes anything.
-- **`build-packages.yml`** — a reusable workflow that builds one package per job in the matching environment (Arch container, Ubuntu runners, Fedora container), runs makepkg/dpkg-buildpackage/rpmbuild and the Tauri AppImage bundler, validates each produced package (`pacman -Qip`, `dpkg-deb --info` + lintian, `rpm -qip`, ELF check for the AppImage), and uploads one artifact per format. This workflow NEVER publishes a release - it only uploads artifacts; a banner job in the run output says so explicitly.
-- **`release.yml`** — triggered only by pushing a `v*` tag. It first validates the run context (loudly failing if the event is not a tag push matching `v*`), then the tag against every project manifest, calls the build workflow, downloads the four artifacts, verifies exactly one package per format is present and that every file name carries the released version (naming the missing format and its build job if not), generates `SHA256SUMS`, and creates the GitHub Release with GitHub-generated notes, a title, and `--latest`. Only the publish job has `contents: write`; every build job is read-only. A concurrency group keyed on the tag prevents duplicate publication.
+Run npm run finalize-release and verify-updater-artifact.mjs. Confirm the new installer, signature, latest.json, release notes, changelog hash and packaging manifests all describe the same bytes. Do not use a previous build's checksum or invent a download URL for an unavailable release.
 
-Note: GitHub fires the tag trigger only when the pushed tag points at a commit that contains `.github/workflows/release.yml`. Always tag the current reviewed tip of `main`, not an older commit.
+## 4. Qualify on Windows
 
-## Version consistency
-
-The Git tag is the release version source. `scripts/verify-packaging-metadata.mjs` compares the application version across `package.json`, `src-tauri/tauri.conf.json`, `src-tauri/Cargo.toml`, `src-tauri/Cargo.lock`, `packaging/arch/PKGBUILD`, `packaging/debian/changelog` and `packaging/fedora/linuxdevstackbox.spec`, and — when a tag is given — fails unless the tag matches. The version is bumped deliberately in all those files in a single commit before tagging; CI fails early if they drift.
-
-## Package validation levels
-
-The pipeline distinguishes explicitly:
-
-- **Package build validation** — makepkg/dpkg-buildpackage/rpmbuild must succeed (this happens in every build job and release run).
-- **Package metadata validation** — `pacman -Qip/-Qlp`, `dpkg-deb --info/--contents` + lintian, `rpm -qip/-qpl/--requires` run against the built packages inside the same job.
-- **Installation testing** — installing the packages in real Arch/Debian/Fedora environments. The workflows verify archives and metadata; they do not install the packages. Run a manual install test per family before or after a release where possible, and record results in [docs/RELEASE-VALIDATION.md](https://github.com/mamsm-dev/LinuxDevStackBox/blob/main/docs/RELEASE-VALIDATION.md).
-- **Application runtime testing** — starting services, serving PHP, database operations. Never covered by the pipeline automatically; follow [Testing](./testing) and the qualification gates below.
-
-## Qualification gates (unchanged)
-
-Automated publication removes the build step from the manual runbook, not the acceptance gates:
-
-- Test a fresh install and an upgrade in a clean environment for each supported distro family where possible, with project/database backups.
+- Test a fresh install and an upgrade from v0.1.21, with project/database backups.
 - Verify custom ports, user PHP settings, site records and database contents survive.
-- Verify the first-launch flow: XDG data roots are created, phpMyAdmin is cloned into the data root, and the only elevated prompts are the two `pkexec` operations.
-- Record actual results and remaining limitations; never label unperformed tests as passed.
+- Verify the Apache migration creates its backup and does not duplicate the baseline after restart.
+- Verify Laravel public-directory routes, static assets, HTTP and HTTPS, and a project with parent .htaccess. Check that private parent files remain inaccessible.
+- Verify plain PHP and a root-level rewrite project; global and pinned PHP selections.
+- Compare the displayed log path with the running server configuration and confirm a fresh request is observable.
+- Check localhost, phpMyAdmin, large SQL restore failure reporting and updater progress.
 
-## Website
+Record actual results and remaining limitations in docs/RELEASE-VALIDATION.md. Do not label unperformed tests as passed. [Testing](./testing) and the repository checklist `docs/getting-started/local-install-test.md` provide details.
 
-Hosted website builds remain a separate, manual step. Pin the app-doc source ref to the exact reviewed commit and publish only after the GitHub Release assets are available; release availability is read from GitHub, not inferred from the source version.
+## 5. Publish and verify
+
+Commit reviewed source and finalized release metadata, create the v0.1.22 tag, and upload the installer, its .sig and latest.json. Verify remote assets with finalize-release --verify-github v0.1.22 and test the in-app update from v0.1.21.
+
+## 6. Website
+
+Commit the source docs before hosted website builds. Pin DEVSTACKBOX_REF to v0.1.22 or the exact reviewed commit. Run content preparation, website tests, lint, build and HTTP smoke checks. Publish only after download assets are available; release availability is read from GitHub, not inferred from source version. Use approved native-resolution screenshots matching the documentation baseline. Keep capture provenance distinct from release availability.

@@ -54,7 +54,7 @@ export function SslPage() {
           </h2>
           <p className="mt-1 text-sm text-muted-foreground">
             {text(
-              "System trust, site certificates, and live connections checked together.",
+              "system trust store, site certificates, and live connections checked together.",
               "सिस्टम ट्रस्ट, प्रमाणपत्र और लाइव कनेक्शन की एक साथ जाँच।",
             )}
           </p>
@@ -104,8 +104,8 @@ export function SslPage() {
                 status?.ca_trusted ||
                 window.confirm(
                   text(
-                    "Set up a private local certificate authority and install it into the system trust store? It can issue certificates trusted by your browsers. Its private key stays on this computer.",
-                    "स्थानीय प्रमाणपत्र प्राधिकरण बनाकर सिस्टम ट्रस्ट स्टोर में जोड़ें? उसकी निजी कुंजी इसी कंप्यूटर पर रहेगी।",
+                    "Set up a private local certificate authority and trust it for this user account? It can issue certificates trusted by your browsers. Keep its private key on this computer.",
+                    "इस उपयोगकर्ता खाते के लिए स्थानीय प्रमाणपत्र प्राधिकरण बनाकर विश्वसनीय करें? उसकी निजी कुंजी इसी कंप्यूटर पर रखें।",
                   ),
                 )
               )
@@ -124,7 +124,7 @@ export function SslPage() {
         </div>
         {status && (
           <p className="text-sm">
-            {text("System trust:", "सिस्टम ट्रस्ट:")}{" "}
+            {text("system trust store:", "सिस्टम ट्रस्ट:")}{" "}
             {status.ca_trusted
               ? text("Installed for this account", "इस खाते के लिए स्थापित")
               : text("Missing", "अनुपलब्ध")}{" "}
@@ -184,7 +184,7 @@ export function SslPage() {
               </p>
               <p>
                 {text(
-                  "Live verification checks system trust, hostname, the served certificate and the correct virtual host.",
+                  "Live verification checks system trust store, hostname, the served certificate and the correct virtual host.",
                   "लाइव जाँच सिस्टम ट्रस्ट, नाम, प्रस्तुत प्रमाणपत्र और सही होस्ट जाँचती है।",
                 )}
               </p>

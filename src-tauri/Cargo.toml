@@ -1,8 +1,8 @@
 [package]
 name = "linuxdevstackbox"
-version = "0.1.26"
-description = "A lightweight, open-source local development environment for PHP developers on Linux"
-authors = ["MAM"]
+version = "0.1.22"
+description = "A lightweight, open-source local development environment for PHP developers on Linux (Linux port of DevStackBox)"
+authors = ["Nomad Programmer <hello@devstackbox.com>"]
 edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
@@ -10,6 +10,7 @@ edition = "2021"
 [lib]
 # The `_lib` suffix may seem redundant but it is necessary
 # to make the lib name unique and wouldn't conflict with the bin name.
+# See https://github.com/rust-lang/cargo/issues/8519
 name = "linuxdevstackbox_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
 
@@ -25,10 +26,8 @@ tauri-plugin-process = "2.0"
 tauri-plugin-opener = "2.0"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
-url = "2"
 tokio = { version = "1.0", features = ["full"] }
-reqwest = { version = "0.12", default-features = false, features = ["native-tls", "stream", "json"] }
+reqwest = { version = "0.12", default-features = false, features = ["rustls-tls", "native-tls", "stream", "json"] }
 futures-util = "0.3"
 zip = { version = "2", default-features = false, features = ["deflate"] }
 portable-pty = "0.8"
-libc = "0.2"

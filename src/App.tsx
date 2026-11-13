@@ -159,9 +159,9 @@ function AppShell() {
       const detail = (e as CustomEvent<{ version: string }>).detail;
       setCurrentPhpVersion(detail.version);
     };
-    window.addEventListener("linuxdevstackbox:php-version-changed", handler);
+    window.addEventListener("devstackbox:php-version-changed", handler);
     return () =>
-      window.removeEventListener("linuxdevstackbox:php-version-changed", handler);
+      window.removeEventListener("devstackbox:php-version-changed", handler);
   }, []);
 
   return (
@@ -284,6 +284,14 @@ function AppShell() {
               element={<Navigate to="/terminal" replace />}
             />
             <Route
+              path="/terminal/powershell"
+              element={<Navigate to="/terminal" replace />}
+            />
+            <Route
+              path="/terminal/cmd"
+              element={<Navigate to="/terminal" replace />}
+            />
+            <Route
               path="/terminal/php-cli"
               element={<Navigate to="/terminal" replace />}
             />
@@ -351,7 +359,7 @@ function AppShell() {
 
 function App() {
   return (
-    <ThemeProvider defaultTheme="system" storageKey="linuxdevstackbox-ui-theme">
+    <ThemeProvider defaultTheme="system" storageKey="devstackbox-ui-theme">
       <HashRouter>
         <ServiceStatusProvider>
           <DatabaseCacheProvider><DatabaseOperationsProvider>

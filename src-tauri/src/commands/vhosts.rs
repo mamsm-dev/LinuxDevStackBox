@@ -86,7 +86,7 @@ pub fn normalize_domain(domain: &str) -> Result<String, String> {
         );
     }
     if d == "localhost" || d.ends_with(".localhost") || d.parse::<std::net::IpAddr>().is_ok() {
-        return Err("localhost and IP addresses are managed by DevStackBox.".into());
+        return Err("localhost and IP addresses are managed by LinuxDevStackBox.".into());
     }
     Ok(d)
 }
@@ -121,14 +121,13 @@ pub fn render_site(site: &VhostEntry, tls: bool) -> Result<String, String> {
     };
     let root = to_apache_path(Path::new(&site.doc_root));
     let (runtime, ini) = if let Some(version) = site.php_version.as_deref() {
-        let (_runtime, ini) = super::php::project_runtime(version)?;
+        let (runtime, ini) = super::php::project_runtime(version)?;
         if !ini.is_file() {
             return Err(format!("PHP {version} project configuration is missing. Reapply its version in Project details."));
         }
-        // Pinned projects still execute the system php-cgi; only the ini differs.
-        (super::apache::stage_php_cgi()?, ini)
+        (runtime, ini)
     } else {
-        (super::apache::stage_php_cgi()?, user_config_dir())
+        (active_php_dir(), user_config_dir())
     };
     let php = to_apache_path(&runtime);
     let phprc = if site.php_version.is_some() {
@@ -137,7 +136,8 @@ pub fn render_site(site: &VhostEntry, tls: bool) -> Result<String, String> {
         format!("{}/", to_apache_path(&ini))
     };
     let config = to_apache_path(&user_config_dir());
-    let mut conf=format!("\n<VirtualHost *:{port}>\nServerName {}\nDocumentRoot \"{root}\"\n<Directory \"{root}\">\nOptions -Indexes +FollowSymLinks\nAllowOverride All\nRequire local\nDirectoryIndex index.php index.html index.htm\n</Directory>\nScriptAlias /php/ \"{php}/\"\n<Directory \"{php}\">\nOptions +ExecCGI\nRequire local\n</Directory>\nAction php-script /php/php-cgi\nAddHandler php-script .php\nAddType application/x-httpd-php .php\nSetEnv PHPRC \"{phprc}\"\n",site.domain);
+    let action = super::apache::php_cgi_action(&runtime);
+    let mut conf=format!("\n<VirtualHost *:{port}>\nServerName {}\nDocumentRoot \"{root}\"\n<Directory \"{root}\">\nOptions -Indexes +FollowSymLinks\nAllowOverride All\nRequire local\nDirectoryIndex index.php index.html index.htm\n</Directory>\nScriptAlias /php/ \"{php}/\"\n<Directory \"{php}\">\nOptions +ExecCGI\nRequire local\n</Directory>\nAction php-script {action}\nAddHandler php-script .php\nAddType application/x-httpd-php .php\nSetEnv PHPRC \"{phprc}\"\n",site.domain);
     if !site.aliases.is_empty() {
         conf.push_str(&format!("ServerAlias {}\n", site.aliases.join(" ")));
     }
@@ -225,11 +225,11 @@ pub async fn apply_configuration(entries: &[VhostEntry]) -> Result<(), String> {
     preserve_site_snapshot(&saved)?;
     let running = crate::utils::process::is_our_process_running(
         "httpd",
-        &user_config_dir().join("httpd.conf"),
+        &get_apache_exe(&get_installation_path()),
     );
     let result: Result<(), String> = async {
         let mut http =
-            String::from("# Managed DevStackBox sites; localhost is defined in httpd.conf\n");
+            String::from("# Managed LinuxDevStackBox sites; localhost is defined in httpd.conf\n");
         for site in entries.iter().filter(|s| s.enabled) {
             ssl::write_health(&site.domain)?;
             http.push_str(&render_site(site, false)?);
@@ -237,14 +237,13 @@ pub async fn apply_configuration(entries: &[VhostEntry]) -> Result<(), String> {
         ssl::write_health("localhost")?;
         write_config_file(&config.join("vhosts.conf"), http.as_bytes())?;
         write_config_file(&config.join("ssl.conf"), ssl::render_ssl(entries)?.as_bytes())?;
-        let out = create_hidden_command(
-            super::apache::apache_runtime()?.binary.as_os_str(),
-        )
-        .arg("-f")
-        .arg(config.join("httpd.conf"))
-        .arg("-t")
-        .output()
-        .map_err(|e| e.to_string())?;
+        let out =
+            create_hidden_command(&get_apache_exe(&get_installation_path()).to_string_lossy())
+                .arg("-f")
+                .arg(config.join("httpd.conf"))
+                .arg("-t")
+                .output()
+                .map_err(|e| e.to_string())?;
         if !out.status.success() {
             return Err(format!(
                 "Apache rejected the configuration ({}): {}",
@@ -299,7 +298,7 @@ pub fn edit_hosts(content: &str, domain: &str, add: bool) -> Result<String, Stri
         || content.matches(BEGIN).count() > 1
     {
         return Err(
-            "Hosts file has malformed DevStackBox markers. Resolve them before continuing.".into(),
+            "Hosts file has malformed LinuxDevStackBox markers. Resolve them before continuing.".into(),
         );
     }
     let mut inside = false;
@@ -330,7 +329,7 @@ pub fn edit_hosts(content: &str, domain: &str, add: bool) -> Result<String, Stri
             .skip(1)
             .any(|h| h.eq_ignore_ascii_case(&domain));
         if matches && !inside && add {
-            return Err(format!("{domain} exists outside the DevStackBox hosts block. Resolve that mapping explicitly."));
+            return Err(format!("{domain} exists outside the LinuxDevStackBox hosts block. Resolve that mapping explicitly."));
         }
         if matches && inside {
             let mut retained: Vec<_> = tokens
@@ -375,25 +374,33 @@ async fn change_hosts(domain: &str, add: bool) -> Result<(), String> {
     let path = hosts_path();
     let content = fs::read_to_string(&path).map_err(|e| e.to_string())?;
     let updated = edit_hosts(&content, &domain, add)?;
-    // /etc/hosts is root-owned on every mainstream distribution. Try a direct
-    // write first (covers exceptional setups), then escalate only this one
-    // file edit through pkexec, never the whole application.
-    match fs::write(&path, updated) {
-        Ok(()) => return Ok(()),
-        Err(e) if e.kind() == std::io::ErrorKind::PermissionDenied => {}
-        Err(e) => return Err(format!("Cannot update /etc/hosts: {e}")),
+    if updated == content {
+        return Ok(());
     }
-    let exe = std::env::current_exe().map_err(|e| e.to_string())?;
+    // Root, or a hosts file the user can write: no elevation needed.
+    if ssl::running_as_root()
+        || fs::OpenOptions::new().write(true).open(&path).is_ok()
+    {
+        return fs::write(&path, updated).map_err(|e| e.to_string());
+    }
+    // /etc/hosts needs root: re-run this program through polkit. Inside an
+    // AppImage the mounted binary is not readable by root, so re-run the
+    // AppImage file itself.
+    let exe = match std::env::var_os("APPIMAGE").filter(|v| !v.is_empty()) {
+        Some(appimage) => PathBuf::from(appimage),
+        None => std::env::current_exe().map_err(|e| e.to_string())?,
+    };
     let action = if add { "add" } else { "remove" };
     let out = create_hidden_command("pkexec")
         .arg(&exe)
-        .args(["--hosts-operation", action, &domain])
+        .args(["--hosts-operation", action, domain.as_str()])
         .output()
-        .map_err(|e| format!("Cannot run pkexec: {e}"))?;
+        .map_err(|e| {
+            format!("Cannot ask for administrator permission (pkexec/polkit is required to edit /etc/hosts): {e}")
+        })?;
     if !out.status.success() {
         return Err(
-            "The /etc/hosts update failed or permission was declined. No site was activated."
-                .into(),
+            "Updating /etc/hosts failed or permission was declined. No site was activated.".into(),
         );
     }
     Ok(())
@@ -512,7 +519,7 @@ async fn commit_sites(old: &[VhostEntry], entries: &[VhostEntry]) -> Result<(), 
     let saved = snapshot(&files)?;
     let was_running = crate::utils::process::is_our_process_running(
         "httpd",
-        &user_config_dir().join("httpd.conf"),
+        &get_apache_exe(&get_installation_path()),
     );
     let result: Result<(), String> = async {
         if entries.iter().any(|s| s.enabled && s.https) {
@@ -703,7 +710,7 @@ mod tests {
     }
     #[test]
     fn preserves_unmanaged_and_shared_hosts_lines() {
-        let s="# custom\n127.0.0.1 outside.test\n# LinuxDevStackBox BEGIN\n127.0.0.1 one.test two.test # keep\n# LinuxDevStackBox END\n";
+        let s="# custom\r\n127.0.0.1 outside.test\r\n# LinuxDevStackBox BEGIN\r\n127.0.0.1 one.test two.test # keep\r\n# LinuxDevStackBox END\r\n";
         let out = edit_hosts(s, "one.test", false).unwrap();
         assert!(out.contains("outside.test"));
         assert!(out.contains("127.0.0.1 two.test # keep"));
@@ -717,7 +724,7 @@ mod tests {
     #[test]
     fn legacy_sites_migrate_without_assuming_https() {
         let sites: Vec<VhostEntry> =
-            serde_json::from_str(r#"[{"domain":"old.test","doc_root":"C:/www","enabled":true}]"#)
+            serde_json::from_str(r#"[{"domain":"old.test","doc_root":"/srv/www","enabled":true}]"#)
                 .unwrap();
         assert!(!sites[0].https);
         assert!(sites[0].aliases.is_empty());
@@ -725,7 +732,7 @@ mod tests {
     #[test]
     fn project_identity_survives_rename_and_reload() {
         let mut sites: Vec<VhostEntry> =
-            serde_json::from_str(r#"[{"domain":"old.test","doc_root":"C:/www","enabled":true}]"#)
+            serde_json::from_str(r#"[{"domain":"old.test","doc_root":"/srv/www","enabled":true}]"#)
                 .unwrap();
         assign_project_ids(&mut sites).unwrap();
         let id = sites[0].id.clone();

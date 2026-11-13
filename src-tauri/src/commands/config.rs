@@ -7,12 +7,10 @@ use crate::utils::paths::{user_config_backups_dir, user_config_dir};
 // Resolves the editable config file for a service.
 //
 // All four configs (mysql, apache, php, phpmyadmin) are managed in the user
-// config dir ($XDG_CONFIG_HOME/linuxdevstackbox/config/). The PHP config in
-// particular MUST be the user copy, because Apache loads php.ini from there
-// via the PHPRC env var and the installation directory's php.ini is kept
-// pristine. Earlier this pointed at php/current/php.ini in the install dir,
-// which is never the file PHP
-// actually reads at runtime.
+// config dir (~/.local/share/linuxdevstackbox/config/). The PHP config in
+// particular MUST be the user copy, because PHP loads php.ini from there via
+// the PHPRC env var and the installation directory (read-only inside an
+// AppImage) is never written to.
 fn config_file_for(service: &str) -> Result<PathBuf, String> {
     let config_dir = user_config_dir();
     match service {
@@ -129,7 +127,7 @@ pub async fn restore_config_backup(
 }
 
 fn valid_backup_name(name: &str, prefix: &str) -> bool {
-    name.starts_with(prefix) && name.ends_with(".bak") && !name.contains(['/', '\\', ':']) && !name.contains("..")
+    name.starts_with(prefix) && name.ends_with(".bak") && !name.contains(['/', '\\']) && !name.contains("..")
 }
 
 fn unique_stamp() -> Result<u128, String> {
@@ -144,26 +142,47 @@ fn snapshot(path: &std::path::Path) -> Result<PathBuf, String> {
 }
 
 fn validate_file(service: &str, path: &std::path::Path) -> Result<(), String> {
+    use crate::utils::paths::{
+        active_php_dir, get_apache_exe, get_installation_path, get_mysqld_exe, is_mariadb,
+        php_cli_in,
+    };
     use crate::utils::process::create_hidden_command;
+    let root = get_installation_path();
     let mut cmd = match service {
         "apache" | "httpd" => {
-            let mut cmd = create_hidden_command(crate::utils::paths::get_apache_binary()?.as_os_str());
-            cmd.arg("-t").arg("-f").arg(path); cmd
+            let mut cmd = create_hidden_command(&get_apache_exe(&root).to_string_lossy());
+            cmd.arg("-t").arg("-f").arg(path);
+            cmd
         }
         "mysql" => {
-            let (mysqld, _) = crate::utils::paths::get_mysqld_binary()?;
-            let mut cmd = create_hidden_command(mysqld.as_os_str());
-            cmd.arg(format!("--defaults-file={}", path.display())).arg("--help"); cmd
+            let mysqld = get_mysqld_exe(&root);
+            let mut cmd = create_hidden_command(&mysqld.to_string_lossy());
+            cmd.arg(format!("--defaults-file={}", path.display()));
+            if is_mariadb(&mysqld) {
+                // MariaDB has no --validate-config; --help --verbose parses the
+                // option file and exits non-zero on unknown/invalid options.
+                cmd.args(["--help", "--verbose"]);
+            } else {
+                cmd.arg("--validate-config");
+            }
+            cmd
         }
         "php" => {
-            let mut cmd = create_hidden_command(crate::utils::paths::get_php_binary()?.as_os_str());
-            cmd.arg("-c").arg(path).args(["-r", "echo 'Configuration checked';"]); cmd
+            let mut cmd =
+                create_hidden_command(&php_cli_in(&active_php_dir()).to_string_lossy());
+            cmd.arg("-c")
+                .arg(path)
+                .args(["-r", "echo 'Configuration checked';"]);
+            cmd.env("PHP_INI_SCAN_DIR", "");
+            cmd
         }
         _ => return Err("This configuration cannot be validated independently.".into()),
     };
     let output = cmd.output().map_err(|e| format!("Cannot validate configuration: {e}"))?;
     let errors = String::from_utf8_lossy(&output.stderr);
-    if !output.status.success() || (service == "php" && !errors.trim().is_empty()) {
+    if !output.status.success() || (service == "php"
+            && (!errors.trim().is_empty()
+                || String::from_utf8_lossy(&output.stdout).trim() != "Configuration checked")) {
         return Err(format!("Configuration was not saved. {} {}", errors.trim(), String::from_utf8_lossy(&output.stdout).trim()));
     }
     Ok(())
@@ -175,7 +194,7 @@ mod tests {
     #[test]
     fn rejects_untrusted_backup_names() {
         assert!(valid_backup_name("php.ini_123.bak", "php.ini_"));
-        for name in ["../php.ini_123.bak", "php.ini_123.bak/x", "httpd.conf_123.bak", "php.ini_../x.bak"] {
+        for name in ["../php.ini_123.bak", "/etc/php.ini_123.bak", "httpd.conf_123.bak", "php.ini_../x.bak"] {
             assert!(!valid_backup_name(name, "php.ini_"));
         }
     }

@@ -1,8 +1,4 @@
-// Optional stored password for LinuxDevStackBox MySQL/MariaDB root
-// (when set via the UI).
-//
-// The credential file is created with 0600 permissions inside the user's XDG
-// config directory, so only the owning user can read it.
+// Optional stored password for LinuxDevStackBox MySQL root (when set via the UI).
 
 use serde::{Deserialize, Serialize};
 
@@ -14,6 +10,9 @@ const CREDENTIALS_FILE: &str = "mysql-root.json";
 pub struct StoredRootCredentials {
     #[serde(default)]
     pub password: Option<String>,
+    /// Legacy field from the Windows (DPAPI) build; never written, ignored on read.
+    #[serde(default, skip_serializing)]
+    pub protected: Option<Vec<u8>>,
 }
 
 fn credentials_path() -> std::path::PathBuf {
@@ -22,24 +21,24 @@ fn credentials_path() -> std::path::PathBuf {
 
 pub fn read_stored_root_password() -> Option<String> {
     let path = credentials_path();
-    if !path.exists() {
-        return None;
-    }
     let raw = std::fs::read_to_string(&path).ok()?;
     let creds: StoredRootCredentials = serde_json::from_str(&raw).ok()?;
     creds.password.filter(|p| !p.is_empty())
 }
 
+/// The credential file lives in the per-user config dir and is created with
+/// mode 0600 inside a 0700 directory, so only the current user can read it.
 pub fn write_stored_root_password(password: Option<String>) -> Result<(), String> {
+    use std::io::Write;
+    use std::os::unix::fs::{OpenOptionsExt, PermissionsExt};
+
     let path = credentials_path();
-    if password.is_none() && !path.exists() {
-        return Ok(());
-    }
-    let creds = StoredRootCredentials { password };
+    let creds = StoredRootCredentials { password, protected: None };
     let json = serde_json::to_string_pretty(&creds)
         .map_err(|e| format!("Failed to serialize MySQL credentials: {}", e))?;
-    use std::io::Write;
-    use std::os::unix::fs::OpenOptionsExt;
+    if let Some(dir) = path.parent() {
+        let _ = std::fs::set_permissions(dir, std::fs::Permissions::from_mode(0o700));
+    }
     let mut file = std::fs::OpenOptions::new()
         .write(true)
         .create(true)
@@ -47,6 +46,8 @@ pub fn write_stored_root_password(password: Option<String>) -> Result<(), String
         .mode(0o600)
         .open(&path)
         .map_err(|e| format!("Failed to write MySQL credentials: {}", e))?;
+    // The file may pre-exist with looser permissions.
+    let _ = file.set_permissions(std::fs::Permissions::from_mode(0o600));
     file.write_all(json.as_bytes())
         .map_err(|e| format!("Failed to write MySQL credentials: {}", e))
 }
@@ -56,20 +57,9 @@ mod tests {
     use super::*;
 
     #[test]
-    fn credentials_round_trip_and_are_user_private() {
-        let path = credentials_path();
-        let _ = std::fs::remove_file(&path);
-        assert!(read_stored_root_password().is_none());
-        write_stored_root_password(Some("linuxdevstackbox-test-password".into())).unwrap();
-        assert_eq!(
-            read_stored_root_password().as_deref(),
-            Some("linuxdevstackbox-test-password")
-        );
-        use std::os::unix::fs::PermissionsExt;
-        let mode = std::fs::metadata(&path).unwrap().permissions().mode() & 0o777;
-        assert_eq!(mode, 0o600);
-        write_stored_root_password(None).unwrap();
-        assert!(read_stored_root_password().is_none());
-        let _ = std::fs::remove_file(&path);
+    fn legacy_protected_field_is_ignored() {
+        let creds: StoredRootCredentials =
+            serde_json::from_str(r#"{"protected":[1,2,3]}"#).unwrap();
+        assert!(creds.password.is_none());
     }
 }

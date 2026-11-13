@@ -37,9 +37,9 @@ interface AutoUpdaterProps {
 }
 
 const PRIMARY_LABEL_DEFAULTS: Record<UpdaterPrimaryButtonLabelKey, string> = {
-  "updater.restartAndUpdate": "How to update",
-  "updater.retryUpdate": "Retry check",
-  "updater.getUpdate": "How to update",
+  "updater.restartAndUpdate": "Restart & Update",
+  "updater.retryUpdate": "Retry update",
+  "updater.updateNow": "Download & Install",
   "updater.preparingShort": "Preparing…",
   "updater.downloadingShort": "Downloading…",
   "updater.installingShort": "Installing…",

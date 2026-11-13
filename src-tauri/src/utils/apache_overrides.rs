@@ -21,7 +21,7 @@ pub fn migrate(path: &std::path::Path, apache: &std::path::Path) -> Result<(), S
     let backup = path.with_extension(format!("{stamp}.pre-overrides.conf"));
     std::fs::write(&staged, updated).map_err(|e| e.to_string())?;
     let result = (|| {
-        let output = crate::utils::process::create_hidden_command(apache.as_os_str())
+        let output = crate::utils::process::create_hidden_command(&apache.to_string_lossy())
             .arg("-f").arg(&staged).arg("-t").output().map_err(|e| e.to_string())?;
         if !output.status.success() {
             return Err(format!("Apache directory migration rejected; original configuration retained: {}", String::from_utf8_lossy(&output.stderr)));
@@ -42,19 +42,19 @@ mod tests {
         let migrated = with_baseline(original);
         assert!(migrated.ends_with(original));
         assert_eq!(with_baseline(&migrated), migrated);
-        let crlf_lines = migrated.replace("\n", "\r\n");
-        assert_eq!(with_baseline(&crlf_lines), crlf_lines);
+        let windows_lines = migrated.replace("\r\n", "\n").replace('\n', "\r\n");
+        assert_eq!(with_baseline(&windows_lines), windows_lines);
         assert!(migrated.starts_with(BASELINE));
     }
 
     #[test]
     fn validation_failure_does_not_replace_original() {
-        let dir = std::env::temp_dir().join(format!("dsb-overrides-test-{}", std::process::id()));
+        let dir = std::env::temp_dir().join(format!("ldsb-overrides-test-{}", std::process::id()));
         std::fs::create_dir_all(&dir).unwrap();
         let file = dir.join("httpd.conf");
         let original = "Listen 127.0.0.1:8080\n# custom config\n";
         std::fs::write(&file, original).unwrap();
-        assert!(migrate(&file, &dir.join("missing-httpd")).is_err());
+        assert!(migrate(&file, &dir.join("missing-apache")).is_err());
         assert_eq!(std::fs::read_to_string(&file).unwrap(), original);
         assert_eq!(std::fs::read_dir(&dir).unwrap().count(), 1);
         std::fs::remove_file(file).unwrap();

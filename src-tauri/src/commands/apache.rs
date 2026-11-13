@@ -1,93 +1,75 @@
 // Apache service commands.
 
-use std::sync::OnceLock;
 use std::time::Duration;
 use tokio::time::sleep;
 
 use crate::commands::php::patch_php_ini;
 use crate::types::ServiceInfo;
-use crate::utils::config_ports::apache_listen_port;
+use crate::utils::config_ports::{apache_listen_port, default_http_port};
 use crate::utils::config_version::needs_config_migration;
 use crate::utils::paths::{
-    get_apache_binary, get_php_cgi_binary, get_user_data_root, phpmyadmin_dir, to_apache_path,
-    user_config_dir, user_logs_dir, user_www_dir,
+    active_php_dir, get_apache_exe, get_apache_modules_dir, get_installation_path, get_mime_types_file,
+    prepare_apache_server_root, user_config_dir, user_logs_dir, user_www_dir,
 };
 use crate::utils::process::{
-    create_hidden_command, create_service_command, ensure_port_available, find_our_processes,
-    is_our_process_running, kill_pid,
+    create_hidden_command, ensure_port_available, find_our_processes, is_our_process_running, kill_pid,
 };
 
 pub const APACHE_CONFIG_VERSION: u32 = 10;
 
-/// Parse ` -D HTTPD_ROOT="/etc/httpd"` from `httpd -V` output.
-fn parse_httpd_root(output: &str) -> Option<String> {
-    for line in output.lines() {
-        if let Some(rest) = line.trim().strip_prefix("-D HTTPD_ROOT=") {
-            return Some(rest.trim_matches('"').to_string());
-        }
+/// Path (relative to the `/php/` ScriptAlias) of the php-cgi binary inside a
+/// PHP runtime dir, e.g. `/php/php-cgi` or `/php/bin/php-cgi`.
+pub fn php_cgi_action(runtime: &std::path::Path) -> String {
+    let flat = runtime.join(crate::utils::paths::PHP_CGI_NAME);
+    if flat.exists() {
+        format!("/php/{}", crate::utils::paths::PHP_CGI_NAME)
+    } else {
+        format!("/php/bin/{}", crate::utils::paths::PHP_CGI_NAME)
     }
-    None
 }
 
-/// Resolved Apache runtime paths (binary, ServerRoot, modules dir, mime.types).
-pub struct ApacheRuntime {
-    pub binary: std::path::PathBuf,
-    pub server_root: std::path::PathBuf,
-    pub modules_dir: std::path::PathBuf,
-    pub mime_types: std::path::PathBuf,
-}
-
-fn locate_modules_dir(server_root: &std::path::Path) -> Option<std::path::PathBuf> {
-    [
-        server_root.join("modules"),
-        std::path::PathBuf::from("/usr/lib/httpd/modules"),
-        std::path::PathBuf::from("/usr/lib64/httpd/modules"),
-        std::path::PathBuf::from("/usr/lib/apache2/modules"),
-    ]
-    .into_iter()
-    .find(|dir| dir.join("mod_dir.so").is_file())
-}
-
-fn locate_mime_types(server_root: &std::path::Path) -> Option<std::path::PathBuf> {
-    [
-        server_root.join("conf").join("mime.types"),
-        server_root.join("mime.types"),
-        std::path::PathBuf::from("/etc/httpd/conf/mime.types"),
-        std::path::PathBuf::from("/etc/apache2/mime.types"),
-        std::path::PathBuf::from("/etc/mime.types"),
-    ]
-    .into_iter()
-    .find(|p| p.is_file())
-}
-
-/// Resolve the Apache binary plus ServerRoot/modules/mime.types locations.
-/// Cached: `httpd -V` is an external call and the layout never changes mid-run.
-pub fn apache_runtime() -> Result<&'static ApacheRuntime, String> {
-    static RUNTIME: OnceLock<Option<ApacheRuntime>> = OnceLock::new();
-    RUNTIME
-        .get_or_init(|| {
-            let binary = get_apache_binary().ok()?;
-            let output = create_hidden_command(&binary).arg("-V").output().ok()?;
-            let text = String::from_utf8_lossy(&output.stdout).into_owned();
-            let server_root = parse_httpd_root(&text)
-                .map(std::path::PathBuf::from)
-                .unwrap_or_else(|| std::path::PathBuf::from("/etc/httpd"));
-            let modules_dir = locate_modules_dir(&server_root)?;
-            let mime_types = locate_mime_types(&server_root)?;
-            Some(ApacheRuntime {
-                binary,
-                server_root,
-                modules_dir,
-                mime_types,
-            })
-        })
-        .as_ref()
-        .ok_or_else(|| {
-            "The Apache HTTP server was not found. Install the distribution \
-             package: `sudo pacman -S apache` (Arch), `sudo apt install apache2` \
-             (Debian/Ubuntu) or `sudo dnf install httpd` (Fedora)."
-                .to_string()
-        })
+/// `LoadModule` lines for modules that actually exist as shared objects in the
+/// modules dir (system Apache builds ship most modules as .so files and
+/// compile some in statically; only emit what is present).
+fn module_lines(modules_dir: Option<&std::path::Path>, ssl: bool) -> String {
+    let Some(dir) = modules_dir else { return String::new() };
+    let has = |m: &str| dir.join(format!("mod_{m}.so")).exists();
+    let mut out = String::new();
+    // Exactly one MPM must be loaded when MPMs are shared objects.
+    let mpm = ["event", "worker", "prefork"].into_iter().find(|m| has(&format!("mpm_{m}")));
+    if let Some(m) = mpm {
+        out.push_str(&format!("LoadModule mpm_{m}_module modules/mod_mpm_{m}.so\n"));
+    }
+    let mut push = |name: &str, file: &str| {
+        if has(file) {
+            out.push_str(&format!("LoadModule {name}_module modules/mod_{file}.so\n"));
+        }
+    };
+    push("unixd", "unixd");
+    push("authz_core", "authz_core");
+    push("authz_host", "authz_host");
+    push("access_compat", "access_compat");
+    push("dir", "dir");
+    push("mime", "mime");
+    push("log_config", "log_config");
+    push("alias", "alias");
+    push("actions", "actions");
+    push("headers", "headers");
+    push("env", "env");
+    push("setenvif", "setenvif");
+    push("rewrite", "rewrite");
+    // mod_cgi is for prefork; threaded MPMs need mod_cgid.
+    if mpm == Some("prefork") {
+        push("cgi", "cgi");
+        push("cgid", "cgid");
+    } else {
+        push("cgid", "cgid");
+        push("cgi", "cgi");
+    }
+    if ssl {
+        push("socache_shmcb", "socache_shmcb");
+    }
+    out
 }
 
 /// Ensure httpd.conf exists and is migrated to the current template version.
@@ -104,17 +86,13 @@ pub async fn ensure_apache_config() -> Result<(), String> {
             "Detected outdated Apache config. Migrating to configVersion {}...",
             APACHE_CONFIG_VERSION
         );
-        let backup = config_path.with_extension("pre-v10.conf");
+        let backup = config_path.with_extension(format!("pre-v{APACHE_CONFIG_VERSION}.conf"));
         if !backup.exists() { std::fs::copy(&config_path, backup).map_err(|e| e.to_string())?; }
-        let port = apache_listen_port();
+        // apache_listen_port() reads the existing config, so the user's port survives.
         create_default_apache_config().await?;
-        if port != 8080 {
-            let generated = std::fs::read_to_string(&config_path).map_err(|e| e.to_string())?;
-            std::fs::write(&config_path, generated.replace(":8080", &format!(":{port}"))).map_err(|e| e.to_string())?;
-        }
     }
     harden_directory_listing(&config_path)?;
-    crate::utils::apache_overrides::migrate(&config_path, &apache_runtime()?.binary)
+    crate::utils::apache_overrides::migrate(&config_path, &get_apache_exe(&get_installation_path()))
 }
 
 /// Disable automatic directory indexes in managed Apache directories while
@@ -188,7 +166,7 @@ mod apache_config_tests {
     #[test]
     fn disables_indexes_without_changing_other_options() {
         let path = std::env::temp_dir().join(format!(
-            "lds-httpd-test-{}.conf",
+            "linuxdevstackbox-httpd-test-{}.conf",
             std::process::id()
         ));
         std::fs::write(
@@ -204,14 +182,15 @@ mod apache_config_tests {
     }
 }
 
-fn httpd_conf_path() -> std::path::PathBuf {
-    user_config_dir().join("httpd.conf")
+fn apache_exe_path() -> std::path::PathBuf {
+    let base = get_installation_path();
+    get_apache_exe(&base)
 }
 
 #[tauri::command]
 pub async fn get_apache_status() -> Result<ServiceInfo, String> {
-    let marker = httpd_conf_path();
-    let our_pids = find_our_processes("httpd", &marker);
+    let exe = apache_exe_path();
+    let our_pids = find_our_processes("httpd", &exe);
     let running = !our_pids.is_empty();
     let pid = our_pids.first().copied();
 
@@ -225,59 +204,33 @@ pub async fn get_apache_status() -> Result<ServiceInfo, String> {
     })
 }
 
-/// Directory holding a php-cgi symlink so the CGI handler is granted
-/// execution only for that one file instead of an entire system binary dir.
-fn php_cgi_staging_dir() -> std::path::PathBuf {
-    get_user_data_root().join("cgi-bin")
-}
-
-pub(crate) fn stage_php_cgi() -> Result<std::path::PathBuf, String> {
-    let php_cgi = get_php_cgi_binary()?;
-    let dir = php_cgi_staging_dir();
-    std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
-    let link = dir.join("php-cgi");
-    let target_changed = std::fs::read_link(&link)
-        .map(|current| current != php_cgi)
-        .unwrap_or(true);
-    if target_changed || !link.exists() {
-        let _ = std::fs::remove_file(&link);
-        std::os::unix::fs::symlink(&php_cgi, &link)
-            .map_err(|e| format!("Cannot stage php-cgi handler: {e}"))?;
-    }
-    Ok(dir)
-}
-
 #[tauri::command]
 pub async fn start_apache() -> Result<bool, String> {
     let _runtime_guard = super::php::PHP_RUNTIME_LOCK.try_lock()
         .map_err(|_| "Wait for the PHP update or version switch to finish before starting Apache.")?;
+    let base_path = get_installation_path();
 
-    let runtime = apache_runtime()?;
-    let config_path = httpd_conf_path();
+    let apache_path = get_apache_exe(&base_path);
+    if !apache_path.exists() {
+        return Err(format!(
+            "Apache binary not found at {}. Please ensure Apache is installed.",
+            apache_path.display()
+        ));
+    }
 
-    if is_our_process_running("httpd", &config_path) {
+    if is_our_process_running("httpd", &apache_path) {
         return Ok(true);
     }
     super::php::validate_web_runtimes()?;
 
     ensure_apache_config().await?;
 
-    let config_path = httpd_conf_path();
+    let config_path = user_config_dir().join("httpd.conf");
 
-    // If ssl.conf exists but references stale paths, delete it and immediately
-    // regenerate it with correct paths so the user doesn't have to do anything.
     let ssl_conf_path = user_config_dir().join("ssl.conf");
-    if ssl_conf_path.exists() {
-        let has_stale_paths = std::fs::read_to_string(&ssl_conf_path)
-            .map(|c| c.contains("//?/") || c.contains(r"\\?\"))
-            .unwrap_or(false);
-        if has_stale_paths {
-            println!("ssl.conf contains stale paths - removing and regenerating ssl.conf");
-            let _ = std::fs::remove_file(&ssl_conf_path);
-        }
-    }
-    // If ssl.conf is absent but HTTPS is enabled (e.g. the file was lost),
-    // regenerate it automatically so HTTPS comes back without user action.
+    // If ssl.conf is absent but certs already exist (e.g. it was deleted by
+    // the migration above, or the file was lost), regenerate it automatically
+    // so HTTPS comes back without the user having to click "Enable SSL" again.
     if !ssl_conf_path.exists() && crate::commands::ssl::https_enabled() {
         let entries = crate::commands::vhosts::load_vhosts()?;
         let config = crate::commands::ssl::render_ssl(&entries)?;
@@ -293,26 +246,16 @@ pub async fn start_apache() -> Result<bool, String> {
     seed_www_dir();
 
     let listen_port = apache_listen_port();
-    // Fail fast if the configured listen port is taken.
+    // Phase 5.2 - fail fast if the configured listen port is taken.
     ensure_port_available(listen_port, "Apache")?;
 
-    let php_cgi_dir = stage_php_cgi()?;
-
-    let output = create_hidden_command(&runtime.binary)
-        .arg("-f")
-        .arg(&config_path)
-        .arg("-t")
-        .output()
-        .map_err(|e| e.to_string())?;
+    let output = create_hidden_command(&apache_path.to_string_lossy()).arg("-f").arg(&config_path).arg("-t").current_dir(&base_path).output().map_err(|e| e.to_string())?;
     if !output.status.success() { return Err(format!("Apache configuration validation failed ({}): {}", output.status, String::from_utf8_lossy(&output.stderr))); }
 
-    // -DFOREGROUND keeps the parent as our child so start failure detection and
-    // process-group shutdown work; the process group isolates the server tree.
-    let mut child = match create_service_command(runtime.binary.as_os_str())
-        .arg("-DFOREGROUND")
+    let mut child = match create_hidden_command(&apache_path.to_string_lossy())
         .arg("-f")
         .arg(&config_path)
-        .env("PHPRC", user_config_dir())
+        .current_dir(&base_path)
         .stdin(std::process::Stdio::null())
         .stdout(std::process::Stdio::null())
         .stderr(std::process::Stdio::null())
@@ -321,31 +264,32 @@ pub async fn start_apache() -> Result<bool, String> {
         Ok(c) => c,
         Err(e) => return Err(format!("Failed to start Apache: {}", e)),
     };
-    let _ = php_cgi_dir;
 
     println!("Apache started with PID: {}", child.id());
 
     sleep(Duration::from_secs(2)).await;
 
+    // Apache daemonizes: the launched parent exits after forking the real
+    // server. Treat a parent exit as non-fatal (this also reaps it) and let the
+    // port check below decide whether the server is actually up.
     match child.try_wait() {
         Ok(Some(status)) => {
-            let _ = child;
-            return Err(format!(
-                "Apache exited immediately (code: {}). Check the Apache error log at {}.",
+            println!(
+                "Apache parent process exited (code: {}) - checking port {} for worker process",
                 status
                     .code()
                     .map(|c| c.to_string())
                     .unwrap_or_else(|| "unknown".into()),
-                user_logs_dir().join("error.log").display()
-            ));
+                listen_port
+            );
         }
-        Ok(None) => {} // still running - good
+        Ok(None) => {} // parent still running - good
         Err(e) => {
             eprintln!("Could not query Apache child status: {}", e);
         }
     }
 
-    if is_our_process_running("httpd", &config_path)
+    if is_our_process_running("httpd", &apache_path)
         && std::net::TcpStream::connect_timeout(
             &std::net::SocketAddr::from(([127, 0, 0, 1], listen_port)),
             Duration::from_secs(2),
@@ -354,21 +298,23 @@ pub async fn start_apache() -> Result<bool, String> {
     {
         Ok(true)
     } else {
-        Err(format!("LinuxDevStackBox Apache did not become ready on port {listen_port}. Check the Apache error log at {}.", user_logs_dir().join("error.log").display()))
+        Err(format!("LinuxDevStackBox Apache did not become ready on port {listen_port}. Check the Apache error log."))
     }
 }
 
 #[tauri::command]
 pub async fn stop_apache() -> Result<bool, String> {
     let _maintenance = super::log_management::MaintenanceAfterStop;
-    let config_path = httpd_conf_path();
+    let apache_path = apache_exe_path();
 
-    if !is_our_process_running("httpd", &config_path) {
+    if !is_our_process_running("httpd", &apache_path) {
         return Ok(true);
     }
 
-    if let Ok(runtime) = apache_runtime() {
-        let _ = create_hidden_command(&runtime.binary)
+    if apache_path.exists() {
+        let config_path = user_config_dir().join("httpd.conf");
+
+        let _ = create_hidden_command(&apache_path.to_string_lossy())
             .args(["-f", config_path.to_str().unwrap_or(""), "-k", "stop"])
             .output();
 
@@ -377,7 +323,7 @@ pub async fn stop_apache() -> Result<bool, String> {
 
     let mut errors: Vec<String> = Vec::new();
     for attempt in 0..4 {
-        let pids = find_our_processes("httpd", &config_path);
+        let pids = find_our_processes("httpd", &apache_path);
         if pids.is_empty() {
             return Ok(true);
         }
@@ -389,68 +335,60 @@ pub async fn stop_apache() -> Result<bool, String> {
         sleep(Duration::from_millis(if attempt == 0 { 1000 } else { 500 })).await;
     }
 
-    if find_our_processes("httpd", &config_path).is_empty() {
+    if find_our_processes("httpd", &apache_path).is_empty() {
         Ok(true)
     } else {
         Err(format!(
-            "LinuxDevStackBox Apache processes are still running after multiple kill attempts.\n\n\
+            "LinuxDevStackBox Apache processes are still running after multiple stop attempts.\n\n\
             Try:\n\
             1. Close any browser tabs accessing localhost\n\
-            2. Run `pkill -f {}` in a terminal\n\n\
+            2. Check `ps aux | grep -E 'apache2|httpd'` for leftover processes\n\
+            3. Stop them manually with `kill <pid>`\n\n\
             Errors: {}",
-            config_path.display(),
             errors.join("; ")
         ))
     }
 }
 
 pub async fn create_default_apache_config() -> Result<(), String> {
-    let runtime = apache_runtime()?;
-    let data_root = get_user_data_root();
+    let install_path = get_installation_path();
+    let port = {
+        let existing = apache_listen_port();
+        if existing == 0 { default_http_port() } else { existing }
+    };
 
-    let server_root = to_apache_path(&runtime.server_root);
-    let modules = to_apache_path(&runtime.modules_dir);
+    let apache_root = prepare_apache_server_root(&install_path)?;
     let www_root = user_www_dir();
     let logs_root = user_logs_dir();
-    let phpmyadmin_root = phpmyadmin_dir();
+    let run_dir = logs_root.join("run");
+    std::fs::create_dir_all(&run_dir).map_err(|e| e.to_string())?;
+    let phpmyadmin_root = crate::utils::phpmyadmin_config::phpmyadmin_root();
+    let config_dir = user_config_dir();
 
-    let user_config = to_apache_path(&user_config_dir());
-    let www_root_str = to_apache_path(&www_root);
-    let logs_root_str = to_apache_path(&logs_root);
-    let mime_types = to_apache_path(&runtime.mime_types);
+    let ap = crate::utils::paths::to_apache_path;
+    let modules = module_lines(get_apache_modules_dir(&install_path).as_deref(), false);
+    let mime_types = get_mime_types_file(&install_path)
+        .map(|p| format!("TypesConfig \"{}\"\n", ap(&p)))
+        .unwrap_or_default();
 
-    // The CGI handler lives behind a symlink in the user data dir so Apache
-    // only grants execution for that single file.
-    let php_cgi_dir = stage_php_cgi()?;
-    let php_cgi_dir_str = to_apache_path(&php_cgi_dir);
+    // PHP-CGI: the active runtime dir holds php-cgi (or bin/php-cgi).
+    let php_cgi_dir = active_php_dir();
+    let php_action = php_cgi_action(&php_cgi_dir);
 
     let config_content = format!(
-        r#"{override_baseline}# configVersion: 10
+        r#"{override_baseline}# configVersion: {version}
 # Apache Configuration for LinuxDevStackBox
 # Managed by LinuxDevStackBox. Edits to this file are preserved across upgrades
 # unless the configVersion is bumped, which triggers a migration.
-ServerRoot "{server_root}"
+ServerRoot "{apache_root_str}"
 PidFile "{logs_root_str}/httpd.pid"
-Listen 127.0.0.1:8080
+DefaultRuntimeDir "{run_dir_str}"
+Listen 127.0.0.1:{port}
+Listen [::1]:{port}
 
-# Essential modules (distribution Apache ships all of these)
-LoadModule mpm_prefork_module {modules}/mod_mpm_prefork.so
-LoadModule unixd_module {modules}/mod_unixd.so
-LoadModule dir_module {modules}/mod_dir.so
-LoadModule mime_module {modules}/mod_mime.so
-LoadModule rewrite_module {modules}/mod_rewrite.so
-LoadModule authz_core_module {modules}/mod_authz_core.so
-LoadModule authz_host_module {modules}/mod_authz_host.so
-LoadModule access_compat_module {modules}/mod_access_compat.so
-LoadModule log_config_module {modules}/mod_log_config.so
-LoadModule cgi_module {modules}/mod_cgi.so
-LoadModule alias_module {modules}/mod_alias.so
-LoadModule actions_module {modules}/mod_actions.so
-LoadModule headers_module {modules}/mod_headers.so
-LoadModule env_module {modules}/mod_env.so
-LoadModule setenvif_module {modules}/mod_setenvif.so
-
-ServerName localhost
+# Modules (only those present on this system are loaded)
+{modules}
+ServerName localhost:{port}
 DocumentRoot "{www_root_str}"
 
 <Directory "{www_root_str}">
@@ -461,22 +399,21 @@ DocumentRoot "{www_root_str}"
 </Directory>
 
 # MIME Types
-TypesConfig "{mime_types}"
-AddType text/html .html .htm
+{mime_types}AddType text/html .html .htm
 
 # PHP CGI configuration
 ScriptAlias /php/ "{php_cgi_dir_str}/"
-Action php-script /php/php-cgi
+Action php-script {php_action}
 AddHandler php-script .php
 AddType application/x-httpd-php .php
 
 # Tell PHP-CGI where to find its php.ini.  The user-config php.ini is written
-# to the XDG config dir so it never pollutes system configuration.
+# to the user data dir so it never pollutes the installation directory.
 SetEnv PHPRC "{user_config}/"
 
 <Directory "{php_cgi_dir_str}">
     AllowOverride None
-    Options ExecCGI FollowSymLinks
+    Options ExecCGI
     Require all granted
 </Directory>
 
@@ -496,7 +433,7 @@ IncludeOptional "{user_config}/ssl.conf"
 # This is always the FIRST VirtualHost. Once user vhosts are added, Apache
 # uses name-based selection; localhost must be first so http://localhost/
 # and http://localhost/phpmyadmin always work regardless of user vhosts.
-<VirtualHost *:8080>
+<VirtualHost *:{port}>
     ServerName localhost
     ServerAlias 127.0.0.1
     DocumentRoot "{www_root_str}"
@@ -510,7 +447,7 @@ IncludeOptional "{user_config}/ssl.conf"
     # PHP handler - explicit inside VirtualHost so it is not subject to
     # global-scope merge behavior in name-based virtual host mode.
     AddHandler php-script .php
-    Action php-script /php/php-cgi
+    Action php-script {php_action}
     AddType application/x-httpd-php .php
 
     # phpMyAdmin - Alias inside VirtualHost because global-scope Alias
@@ -534,23 +471,27 @@ IncludeOptional "{user_config}/ssl.conf"
 IncludeOptional "{user_config}/vhosts.conf"
 "#,
         override_baseline = crate::utils::apache_overrides::BASELINE,
-        server_root = server_root,
-        logs_root_str = logs_root_str,
-        www_root_str = www_root_str,
+        version = APACHE_CONFIG_VERSION,
+        apache_root_str = ap(&apache_root),
+        logs_root_str = ap(&logs_root),
+        run_dir_str = ap(&run_dir),
+        port = port,
         modules = modules,
+        www_root_str = ap(&www_root),
         mime_types = mime_types,
-        php_cgi_dir_str = php_cgi_dir_str,
-        user_config = user_config,
-        pma_root = phpmyadmin_root.display().to_string()
+        php_cgi_dir_str = ap(&php_cgi_dir),
+        php_action = php_action,
+        user_config = ap(&config_dir),
+        pma_root = ap(&phpmyadmin_root),
     );
 
     let phpmyadmin_config = format!(
         r#"# phpMyAdmin Virtual Host Configuration
 
 # Create an alias for phpMyAdmin at /phpmyadmin
-Alias /phpmyadmin "{}"
+Alias /phpmyadmin "{pma}"
 
-<Directory "{}">
+<Directory "{pma}">
     Options -Indexes +FollowSymLinks
     AllowOverride None
     DirectoryIndex index.php index.html
@@ -559,7 +500,7 @@ Alias /phpmyadmin "{}"
 
     # Handle PHP files through CGI
     AddHandler php-script .php
-    Action php-script /php/php-cgi
+    Action php-script {php_action}
 
     # Security rules
     <Files "*.php">
@@ -576,26 +517,23 @@ Alias /phpmyadmin "{}"
 </Directory>
 
 # Alias for easy access
-Alias /pma "{}"
+Alias /pma "{pma}"
 "#,
-        phpmyadmin_root.display(),
-        phpmyadmin_root.display(),
-        phpmyadmin_root.display()
+        pma = ap(&phpmyadmin_root),
+        php_action = php_action,
     );
 
-    let config_dir = user_config_dir();
     std::fs::write(config_dir.join("httpd.conf"), config_content).map_err(|e| e.to_string())?;
     std::fs::write(config_dir.join("phpmyadmin.conf"), phpmyadmin_config)
         .map_err(|e| e.to_string())?;
 
     // Seed the user www dir with default files if it is empty.
     seed_www_dir();
-
-    let _ = data_root;
     Ok(())
 }
 
 // Ensures the web root directory exists and contains a minimal index.html.
+// user_www_dir() is ~/LinuxDevStackBox/www (seeded from the bundled www/).
 // Files are only written if absent, so user edits are never overwritten.
 fn seed_www_dir() {
     let www_dir = user_www_dir();
@@ -612,14 +550,25 @@ fn seed_www_dir() {
 }
 
 async fn get_apache_version() -> Option<String> {
-    let binary = get_apache_binary().ok()?;
+    let base_path = get_installation_path();
+    let apache_path = get_apache_exe(&base_path);
 
-    match create_hidden_command(&binary).arg("-v").output() {
+    if !apache_path.exists() {
+        return None;
+    }
+
+    match create_hidden_command(apache_path.to_str()?)
+        .arg("-v")
+        .output()
+    {
         Ok(output) => {
             let version_str = String::from_utf8_lossy(&output.stdout);
             if let Some(start) = version_str.find("Apache/") {
-                if let Some(end) = version_str[start + 7..].find(" ") {
-                    let version = version_str[start + 7..start + 7 + end].to_string();
+                let version: String = version_str[start + 7..]
+                    .chars()
+                    .take_while(|c| !c.is_whitespace())
+                    .collect();
+                if !version.is_empty() {
                     return Some(version);
                 }
             }

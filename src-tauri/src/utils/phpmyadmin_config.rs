@@ -1,9 +1,73 @@
-use crate::utils::paths::{ensure_phpmyadmin_copy, get_user_data_root, phpmyadmin_dir, to_apache_path};
+use crate::utils::paths::{get_installation_path, get_user_data_root, to_apache_path};
+use std::path::{Path, PathBuf};
 
 const PHPMYADMIN_CONFIG_INC: &str =
     include_str!("../../../config/phpmyadmin.config.inc.php");
 
 const PMA_IMPORT_CONFIG_VERSION: u32 = 1;
+
+fn dir_is_writable(dir: &Path) -> bool {
+    let probe = dir.join(".ldsb-write-test");
+    let ok = std::fs::write(&probe, b"").is_ok();
+    let _ = std::fs::remove_file(&probe);
+    ok
+}
+
+fn copy_tree(from: &Path, to: &Path) -> std::io::Result<()> {
+    std::fs::create_dir_all(to)?;
+    for entry in std::fs::read_dir(from)? {
+        let entry = entry?;
+        let target = to.join(entry.file_name());
+        let kind = entry.file_type()?;
+        if kind.is_dir() {
+            copy_tree(&entry.path(), &target)?;
+        } else if kind.is_symlink() {
+            let _ = std::fs::remove_file(&target);
+            std::os::unix::fs::symlink(std::fs::read_link(entry.path())?, &target)?;
+        } else {
+            std::fs::copy(entry.path(), &target)?;
+        }
+    }
+    Ok(())
+}
+
+/// Directory phpMyAdmin is served from. The bundled copy lives in the install
+/// dir, which is read-only inside an AppImage, and phpMyAdmin reads/writes its
+/// `config.inc.php` next to its code. When the install dir is not writable, a
+/// per-user copy is made once per app version under the user data dir. A
+/// system package (/usr/share/phpmyadmin) is the last fallback.
+pub fn phpmyadmin_root() -> PathBuf {
+    let bundled = get_installation_path().join("phpmyadmin");
+    let source = if bundled.join("index.php").is_file() {
+        bundled
+    } else if let Some(system) = ["/usr/share/phpmyadmin", "/usr/share/webapps/phpMyAdmin", "/usr/share/phpMyAdmin"]
+        .iter()
+        .map(PathBuf::from)
+        .find(|p| p.join("index.php").is_file())
+    {
+        system
+    } else {
+        return bundled;
+    };
+    if dir_is_writable(&source) {
+        return source;
+    }
+    let copy = get_user_data_root().join("phpmyadmin-app");
+    let marker = copy.join(".ldsb-copied-version");
+    let version = env!("CARGO_PKG_VERSION");
+    let current = std::fs::read_to_string(&marker).map(|v| v.trim() == version).unwrap_or(false);
+    if !current {
+        // Preserve a user-edited config across refreshes.
+        let saved = std::fs::read(copy.join("config.inc.php")).ok();
+        if copy_tree(&source, &copy).is_ok() {
+            if let Some(bytes) = saved {
+                let _ = std::fs::write(copy.join("config.inc.php"), bytes);
+            }
+            let _ = std::fs::write(&marker, version);
+        }
+    }
+    copy
+}
 
 fn php_single_quoted_path(path: &str) -> String {
     format!("'{}'", path.replace('\\', "\\\\").replace('\'', "\\'"))
@@ -18,11 +82,9 @@ fn user_phpmyadmin_dirs() -> (std::path::PathBuf, std::path::PathBuf, std::path:
     )
 }
 
-/// Writes the phpMyAdmin config when missing. The served phpMyAdmin copy
-/// lives in the user data dir (see paths::ensure_phpmyadmin_copy) so the
-/// read-only package payload is never modified.
+/// Writes LinuxDevStackBox phpMyAdmin config when missing (e.g. after a bundle refresh without config.inc.php).
 pub fn ensure_phpmyadmin_config_inc() -> Result<(), String> {
-    let pma_dir = phpmyadmin_dir();
+    let pma_dir = phpmyadmin_root();
     if !pma_dir.is_dir() {
         return Ok(());
     }
@@ -66,14 +128,8 @@ fn is_bundled_relative_dir(value: &str) -> bool {
 
 /// Migrate UploadDir/SaveDir/TempDir to user-data paths and raise ExecTimeLimit when still at bundled defaults.
 pub fn patch_phpmyadmin_config() -> Result<(), String> {
-    // phpMyAdmin needs a writable config.inc.php; clone the read-only bundled
-    // copy into the user data dir when the install prefix is not writable.
-    if let Err(error) = ensure_phpmyadmin_copy() {
-        println!("phpMyAdmin staging skipped: {error}");
-        return Ok(());
-    }
     ensure_phpmyadmin_config_inc()?;
-    let pma_dir = phpmyadmin_dir();
+    let pma_dir = phpmyadmin_root();
     let config_path = pma_dir.join("config.inc.php");
     if !config_path.is_file() {
         return Ok(());
@@ -101,8 +157,8 @@ pub fn patch_phpmyadmin_config() -> Result<(), String> {
     }
     // Installed configurations survive upgrades; append the packaged UI policy
     // without replacing connection credentials, ports or user directory settings.
-    if !updated.contains("/linuxdevstackbox-theme.inc.php") {
-        updated.push_str("\nif (is_file(__DIR__ . '/linuxdevstackbox-theme.inc.php')) {\n    include __DIR__ . '/linuxdevstackbox-theme.inc.php';\n}\n");
+    if !updated.contains("/devstackbox-theme.inc.php") {
+        updated.push_str("\nif (is_file(__DIR__ . '/devstackbox-theme.inc.php')) {\n    include __DIR__ . '/devstackbox-theme.inc.php';\n}\n");
     }
     if content.contains("$cfg['UploadDir']") {
         if let Some(line) = content.lines().find(|l| l.contains("$cfg['UploadDir']")) {

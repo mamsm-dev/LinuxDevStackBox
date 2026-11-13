@@ -6,7 +6,7 @@ use std::process::{Command, Stdio};
 pub fn query(mut command: Command, sql: &str) -> Result<String, String> {
     // SQL (including account passwords) is never a process argument.
     let mut child = command
-        .args(["--batch", "--skip-column-names", "--binary-mode"])
+        .args(["--batch", "--skip-column-names", "--loose-binary-mode"])
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())

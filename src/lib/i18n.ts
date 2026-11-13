@@ -31,7 +31,7 @@ i18n
     detection: {
       order: ['localStorage', 'navigator', 'htmlTag'],
       caches: ['localStorage'],
-      lookupLocalStorage: 'linuxdevstackbox-language'
+      lookupLocalStorage: 'devstackbox-language'
     },
 
     interpolation: {

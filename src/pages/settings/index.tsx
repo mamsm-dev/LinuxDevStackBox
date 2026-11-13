@@ -32,7 +32,7 @@ import {
 
 interface SettingsPageProps {}
 
-const AUTO_CHECK_KEY = "linuxdevstackbox.settings.autoCheckUpdates";
+const AUTO_CHECK_KEY = "devstackbox.settings.autoCheckUpdates";
 
 export function SettingsPage({}: SettingsPageProps) {
   const { t, i18n } = useTranslation();
@@ -234,7 +234,7 @@ export function SettingsPage({}: SettingsPageProps) {
               <div className="text-xs text-muted-foreground">
                 {t(
                   "settings.autostartDesc",
-                  "Adds an XDG autostart desktop entry for your user. No admin needed.",
+                  "Adds an XDG autostart entry (~/.config/autostart). No admin needed.",
                 )}
               </div>
             </div>

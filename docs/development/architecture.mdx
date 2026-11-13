@@ -1,12 +1,12 @@
 ---
 title: "Architecture"
-description: "How LinuxDevStackBox components connect."
+description: "How DevStackBox components connect."
 icon: "Layers"
 ---
-# LinuxDevStackBox - Architecture Overview
+# DevStackBox - Architecture Overview
 
-**Architecture baseline**: v0.1.26 (October 2026). For current project/PHP/HTTPS behavior, see [Projects, PHP & HTTPS](../getting-started/projects) and [Feature status](../feature-status).
-**Single Source of Truth**: This file describes how all parts of LinuxDevStackBox connect. Update this file whenever you change the architecture.
+**Architecture baseline**: v0.1.22 (October 2026). For current project/PHP/HTTPS behavior, see [Projects, PHP & HTTPS](../getting-started/projects) and [Feature status](../feature-status).
+**Single Source of Truth**: This file describes how all parts of DevStackBox connect. Update this file whenever you change the architecture.
 
 ---
 
@@ -20,14 +20,14 @@ icon: "Layers"
 | i18n             | i18next                                | EN and HI translations                           |
 | Backend          | Tauri 2 (Rust)                         | Process management, file I/O, native OS ops      |
 | IPC Bridge       | Tauri Commands + Events                | Frontend ↔ Backend communication               |
-| Server binaries  | httpd/apache2, mysqld/mariadbd, php, php-cgi | Resolved from distribution packages (not bundled) |
+| Service binaries | httpd.exe, mysqld.exe (MySQL), php.exe | The actual servers (always bundled in installer) |
 
 ---
 
 ## Directory Map (What Lives Where)
 
 ```text
-LinuxDevStackBox/
+DevStackBox/
 |
 |-- src/                        # FRONTEND (React + Vite)
 |   |-- App.tsx                 # Root component. Routing, layout, top-level state
@@ -60,7 +60,7 @@ LinuxDevStackBox/
 |   |   |   |-- service-actions.tsx          # Buttons: Start, Stop, Open Browser
 |   |   |   |-- status-badge.tsx             # Running/Stopped badge
 |   |   |   |-- log-viewer.tsx               # Log display with search, auto-scroll, color coding
-|   |   |   |-- php-version-selector.tsx     # PHP runtime status display
+|   |   |   |-- php-version-selector.tsx     # PHP version picker with download progress
 |   |   |   |-- php-extensions-dialog.tsx    # PHP extension enable/disable
 |   |   |   |-- service-overflow-menu.tsx    # Three-dot overflow actions per service card
 |   |   |   |-- index.ts                     # Re-exports all service components
@@ -68,7 +68,7 @@ LinuxDevStackBox/
 |   |   |-- sidebar.tsx             # Main navigation sidebar (collapsible)
 |   |   |-- breadcrumb.tsx          # Topbar breadcrumb matching current route
 |   |   |-- command-palette.tsx     # Ctrl+P command palette
-|   |   |-- auto-updater.tsx        # Update check UI (checks GitHub Releases)
+|   |   |-- auto-updater.tsx        # Auto-update UI (checks GitHub Releases)
 |   |   |-- language-switcher.tsx   # EN/HI switcher
 |   |   |-- theme-toggle.tsx        # Dark/Light toggle
 |   |   |-- theme-provider.tsx      # Theme context wrapper
@@ -96,31 +96,32 @@ LinuxDevStackBox/
 |
 |-- src-tauri/                  # BACKEND (Rust + Tauri)
 |   |-- src/
-|   |   |-- main.rs                  # Binary entry point; dispatches the elevated CLI operations (do not touch)
+|   |   |-- main.rs                  # Binary entry point (do not touch)
 |   |   |-- lib.rs                   # Module declarations + run() only (~150 lines)
 |   |   |-- types.rs                 # Shared Rust types (ServiceInfo, PHPVersionInfo, etc.)
 |   |   |-- commands/
 |   |   |   |-- apache.rs            # start_apache, stop_apache, get_apache_status, config gen
 |   |   |   |-- mysql.rs             # start_mysql, stop_mysql, db/user management, backup
-|   |   |   |-- php.rs               # get_php_versions, extension management, php.ini patching
+|   |   |   |-- php.rs               # get_php_versions, switch_php_version, download, patch_php_ini
 |   |   |   |-- config.rs            # read_config, update_config, backup_config, restore
 |   |   |   |-- logs.rs              # get_service_logs, log_crash_event
-|   |   |   |-- system.rs            # check_binaries, get_system_info, start/stop_all
+|   |   |   |-- system.rs            # check_binaries, get_system_info, start/stop_all, autostart
 |   |   |   |-- tray.rs              # show_main_window, hide_to_tray, set_tray_tooltip, quit_app
 |   |   |   |-- terminal.rs          # spawn_terminal, send_terminal_input, kill_terminal_session
 |   |   |   |-- security.rs          # analyze_security
-|   |   |   |-- ssl.rs               # get_ssl_status, generate_ssl_cert, enable_ssl, disable_ssl (system openssl)
-|   |   |   |-- vhosts.rs            # list_vhosts, add_vhost, remove_vhost, toggle_vhost, pkexec hosts edit
+|   |   |   |-- ssl.rs               # get_ssl_status, generate_ssl_cert, enable_ssl, disable_ssl
+|   |   |   |-- vhosts.rs            # list_vhosts, add_vhost, remove_vhost, toggle_vhost, hosts file
 |   |   |   |-- fullbackup.rs        # create_full_backup, list/restore/delete_full_backup
 |   |   |-- utils/
-|   |   |   |-- paths.rs             # get_installation_path, XDG config/data roots, per-service paths
-|   |   |   |-- process.rs           # create_hidden_command, find_our_processes (/proc scanning), kill_pid
+|   |   |   |-- paths.rs             # get_installation_path, user_config_dir, user_logs_dir, etc.
+|   |   |   |-- process.rs           # create_hidden_command, find_our_processes, kill_pid
 |   |
-|   |-- tauri.conf.json         # App config: window size, bundle targets (deb, rpm), resources
+|   |-- tauri.conf.json         # App config: window size, bundle targets, resources
 |   |-- Cargo.toml              # Rust dependencies
 |   |-- build.rs                # Build script
 |   |-- capabilities/           # Tauri permission definitions
 |   |-- icons/                  # App icons
+|   |-- wix/                    # MSI installer customization
 |
 |-- config/                     # Dev-only template configs (tracked in git)
 |   |-- my.cnf                  # MySQL config template
@@ -131,43 +132,35 @@ LinuxDevStackBox/
 |   |-- en.json                 # English translations
 |   |-- hi.json                 # Hindi translations
 |
-|-- packaging/                  # Packaging resources
-|   |-- arch/PKGBUILD           # Arch package build script
-|   |-- phpmyadmin-runtime/     # Staged phpMyAdmin payload bundled into packages
-|   |-- phpmyadmin-policy.json  # phpMyAdmin staging inclusion/exclusion policy
-|
-|-- phpmyadmin/                 # Upstream phpMyAdmin source used to stage the runtime payload
-|-- scripts/                    # Developer utility scripts (Node.js / shell)
+|-- mysql/                      # MySQL binaries (bundled with app)
+|-- apache/                     # Apache binaries (bundled with app)
+|-- php/8.2/, 8.3/, 8.4/, 8.5/ # PHP binaries per version (8.3 bundled; others downloadable)
+|-- php/current                 # Windows junction pointing to active PHP version (runtime only)
+|-- phpmyadmin/                 # phpMyAdmin 5.2.1 PHP files (bundled)
+|-- www/                        # Project web root (preserved during updates)
+|-- scripts/                    # Developer utility scripts (PowerShell / shell)
 |-- docs/                       # THIS FOLDER - All project documentation
 |
 |-- (User Data - NOT in the repo)
-    $XDG_CONFIG_HOME/linuxdevstackbox/    # Config root
-      httpd.conf                # Generated Apache config (editable)
-      my.cnf                    # Generated MySQL config (editable)
-      php.ini                   # Generated PHP config (editable)
-      vhosts.json               # Virtual host records
-      https/                    # Local CA and certificates
-      mysql-root.json           # MySQL root credentials (0600)
-    $XDG_DATA_HOME/linuxdevstackbox/      # Data root
+    %LOCALAPPDATA%\DevStackBox\
+      config/                   # Runtime configs generated by the app
+      config-backups/           # Automatic config backups
       logs/                     # Apache, MySQL, PHP runtime logs
       mysql-data/               # MySQL data directory
-      www/                      # Project web root
       backups/                  # Full backup zip files
-      config-backups/           # Automatic config backups
-      phpmyadmin/               # Writable phpMyAdmin copy (cloned on first run)
-      cgi-bin/                  # Staged php-cgi symlink
+      sessions/                 # PHP session files
 ```
 
 ---
 
 ## UI Layout
 
-LinuxDevStackBox uses a fixed two-panel desktop app layout. Do not redesign this.
+DevStackBox uses a fixed two-panel desktop app layout. Do not redesign this.
 
 ```text
 ┌───────────────────┬──────────────────────────────────────┐
 │  Top Bar          │  Top Bar (continued)                 │
-│  LinuxDevStackBox      │  [Version] [Updates] [Lang] [Theme]  │
+│  DevStackBox      │  [Version] [Updates] [Lang] [Theme]  │
 ├───────────────────┼──────────────────────────────────────┤
 │                   │                                      │
 │  Sidebar          │  Main Content Area                   │
@@ -187,7 +180,7 @@ LinuxDevStackBox uses a fixed two-panel desktop app layout. Do not redesign this
 
 - App title
 - Version badge
-- Update check entry point
+- Auto updater entry point
 - Language switcher
 - Theme toggle (dark/light)
 
@@ -219,7 +212,7 @@ Dashboard
 
 ```text
 [ Apache ]       Running ●
-Port: 8080   PID: 1234
+Port: 80   PID: 1234
 [ Start ]  [ Stop ]  [ Logs ]  [ Config ]
 ```
 
@@ -229,7 +222,7 @@ Expanded view shows: logs, config, ports, PID, arguments.
 This keeps the UI approachable for beginners, powerful for advanced users.
 
 **Design Philosophy:**  
-LinuxDevStackBox should feel like a native desktop utility (like Docker Desktop or GitHub Desktop), NOT like a web admin panel, analytics dashboard, or cPanel.
+DevStackBox should feel like a native desktop utility (like Docker Desktop or GitHub Desktop), NOT like a web admin panel, analytics dashboard, or cPanel.
 
 ## Reuse and Consistency Rules
 
@@ -245,14 +238,17 @@ These rules are architectural, not optional style preferences.
 
 ## App/Data Directory Separation
 
-LinuxDevStackBox separates packaged application files from per-user state following the XDG Base Directory Specification. Packages install the binary and static resources under `/usr/bin/linuxdevstackbox` and `/usr/lib/linuxdevstackbox/` (replaced by package upgrades); all mutable user state lives under the XDG roots (never touched by package operations):
+Current path contract: `user_www_dir()` returns the install directory’s `www`. Configs, logs, MySQL data, and backups use `%LOCALAPPDATA%\devstackbox`. The updater must preserve `www`; do not replace the complete install directory.
 
-- **Config root**: `$XDG_CONFIG_HOME/linuxdevstackbox` (default `~/.config/linuxdevstackbox`) - generated `httpd.conf`, `my.cnf`, `php.ini`, `vhosts.json`, HTTPS material and the 0600 MySQL root credentials file.
-- **Data root**: `$XDG_DATA_HOME/linuxdevstackbox` (default `~/.local/share/linuxdevstackbox`) - `logs/`, `mysql-data/`, `www/`, `backups/`, `config-backups/`, the writable phpMyAdmin copy and the staged `cgi-bin/`.
+This is critical for reliable auto-updates. Violating this causes update-related data loss.
 
-Both roots can be relocated together with the `LINUXDEVSTACKBOX_DATA_DIR` environment variable. Connected projects can also live outside these roots entirely. Never replace or delete the user roots during an upgrade.
+### Current storage contract
 
-This is critical for reliable package upgrades. Violating this causes update-related data loss. See [Configuration](../reference/configuration) for preservation limits.
+The installation directory (default C:\devstackbox) contains the application, bundled service binaries and www/. Updates replace binaries while preserving www/. Connected projects can live outside the installation.
+
+The user data root is %LOCALAPPDATA%\devstackbox, overridden by DEVSTACKBOX_DATA_DIR. It contains config/, config-backups/, logs/, mysql-data/ and backups/. Local HTTPS material is under config/https/. Portable mode remains planned.
+
+Configuration preparation can migrate or normalize selected settings; user data is not wholesale replaced. Apache configVersion 9 and the separate v0.1.17 ancestor-override baseline have distinct migration paths. See [Configuration](../reference/configuration) for preservation limits.
 
 ---
 
@@ -289,35 +285,26 @@ Rust (lib.rs)
           --> listen("event-name", callback)         [Tauri event API]
 ```
 
-This pattern is used for progress and app-shell events such as full backup/restore progress, terminal output, and tray actions. Service status and log refresh still use frontend polling for now.
+This pattern is used for progress and app-shell events such as PHP download progress, full backup/restore progress, terminal output, and tray actions. Service status and log refresh still use frontend polling for now.
 
 ---
 
 ## Service Path Resolution
 
-This is a critical and error-prone area. Path helpers live in `src-tauri/src/utils/paths.rs`.
+This is a critical and error-prone area. Path helpers live in `src-tauri/src/utils/paths.rs`. `get_installation_path()` determines where MySQL, Apache, PHP, and phpMyAdmin binaries live. It checks in this order:
 
-`get_installation_path()` resolves where static application assets (the phpMyAdmin runtime payload, templates) live:
+1. `current_dir` if it contains `apache/bin/httpd.exe`
+2. `exe_parent` (installed app location)
+3. `exe_grandparent`
+4. Production fallbacks: `C:\dsb`, `C:\Program Files\DevStackBox`, `C:\DevStackBox`
+5. `current_dir` as final fallback
 
-1. Debug builds: the repository root
-2. Release builds: the directory next to the executable, then `/usr/lib/linuxdevstackbox` (package installs), selected by whichever contains `phpmyadmin/`
+**In development:** The app runs from `src-tauri/`, so paths resolve to `c:\xampp\htdocs\DevStackBox\`  
+**In production (installed):** The app resolves relative to the installer output directory
 
-Server binaries are never bundled. Apache (`httpd` or `apache2`), MySQL/MariaDB (`mysqld` or `mariadbd`, clients `mysql`/`mariadb`, `mysqldump`/`mariadb-dump`, `mysqladmin`/`mariadb-admin`), PHP (`php`, `php-cgi`, minimum 8.2) and `openssl` are resolved from the distribution packages. The Apache modules directory and `mime.types` are derived from `httpd -V` (`HTTPD_ROOT`), so both httpd-based and apache2-based layouts work.
-
-User state uses two XDG roots (see App/Data Directory Separation above), both overridable with `LINUXDEVSTACKBOX_DATA_DIR`.
+Runtime data is separate from binaries and lives under `%LOCALAPPDATA%\DevStackBox\` unless `DEVSTACKBOX_DATA_DIR` is set.
 
 **Rule:** Never hardcode paths in the frontend. Always let the Rust backend resolve paths.
-
----
-
-## Process Ownership and Privilege Separation
-
-- Service processes are detected by scanning `/proc`; a process counts as "ours" only when its command line references the app's generated config (`httpd.conf` / `my.cnf`). System services that happen to run the same binaries are never touched.
-- Started services run in their own process groups. Stop is graceful first (`httpd -k stop` / `mysqladmin shutdown`), then SIGTERM, then SIGKILL.
-- The GUI never runs as root. Exactly two operations are elevated, each a single fixed-argument `pkexec` invocation of the app binary itself:
-  - `--hosts-operation add|remove <domain>` - edits `/etc/hosts`
-  - `--ca-trust-operation install|remove` - installs or removes the local CA anchor in the distro trust store and refreshes it
-- Other CLI flags: `--setup-local-https`, `--https-status`, `--start-apache`, `--stop-services`.
 
 ---
 
@@ -343,18 +330,22 @@ There is no global state manager (no Redux, Zustand, etc.). State is managed:
 npm run build:release
   --> npm run build (tsc && vite build)  --> dist/
   --> cargo build --release              --> src-tauri/target/release/
-  --> tauri bundle                       --> .deb and .rpm packages
+  --> tauri bundle                       --> NSIS installer and updater artifacts
 ```
 
-Resources bundled into the packages are declared in `tauri.conf.json`:
+Resources bundled into the installer are declared in `tauri.conf.json`:
 
 ```json
 "resources": {
-  "../packaging/phpmyadmin-runtime": "phpmyadmin"
+  "../apache": "apache",
+  "../mysql": "mysql",
+  "../php/8.3": "php/8.3",
+  "../packaging/phpmyadmin-runtime": "phpmyadmin",
+  "../www": "www",
+  "../tools/mkcert": "tools/mkcert",
+  "../packaging/php-cli": "bin"
 }
 ```
-
-Arch packaging does not use the Tauri bundler; it builds from source via `packaging/arch/PKGBUILD` and installs the same phpMyAdmin payload under `/usr/lib/linuxdevstackbox/phpmyadmin`.
 
 ---
 
@@ -377,13 +368,12 @@ Arch packaging does not use the Tauri bundler; it builds from source via `packag
 | `safeInvoke` wrapper                    | Allows frontend to run in browser during development                            |
 | No custom CSS                           | Tailwind + shadcn/ui covers all needs; custom CSS causes theming bugs           |
 | Polling for service status              | Simple and reliable for current service cards; events are used for progress flows |
-| XDG config/data roots                   | Keeps per-user state separate from package-managed files and follows Linux conventions |
+| User data root for runtime configs      | Keeps source and runtime config separate under `%LOCALAPPDATA%\DevStackBox\`   |
 | `config-backups/` auto-backup           | Auto-backup before every config save prevents data loss                         |
 | Two-panel layout (sidebar + main)       | Standard desktop utility pattern; do not redesign                               |
 | Progressive disclosure in service UI    | Beginners see start/stop; experts expand for logs, config, PID                  |
-| App/data directory separation           | Required for safe package upgrades; see reference/installer                     |
-| Distro packages for server binaries     | No bundled servers: smaller packages, security updates via the package manager  |
-| pkexec for the only two elevated ops    | The GUI never runs as root; elevation is a single fixed-argument invocation     |
+| App/data directory separation           | Required for safe auto-updates; see reference/installer              |
+| Installed mode only (no portable in v1) | Portable mode cannot support auto-updates reliably; adds architectural conflict |
 
 
 ## Database operation layer
@@ -394,8 +384,8 @@ Arch packaging does not use the Tauri bundler; it builds from source via `packag
 
 Database metadata is cached in memory, invalidated when the observed MySQL port changes, and older requests cannot overwrite newer refresh results. Persistent operation history is bounded to 50 entries and unfinished jobs are marked interrupted after restart. This is a local operation log, not a distributed transaction coordinator.
 
-## Log management
+## Log management and PHP CLI
 
 `commands/log_management.rs` owns managed-file validation, archive integrity and shared rotation/retention. `use-log-stream.ts` reads bounded incremental tails and pauses background polling. Clear view advances a view cursor; archive/delete are separate filesystem operations. Service writers must stop before archival.
 
-The build stages phpMyAdmin using `scripts/stage-phpmyadmin.mjs` into `packaging/phpmyadmin-runtime`; the packages ship that read-only payload, and the app clones it into the user data root on first run because `config.inc.php` must be writable.
+The installer stages phpMyAdmin using `scripts/stage-phpmyadmin.mjs` and builds the native launcher with `scripts/build-php-cli.mjs`. The launcher in `bin/php.exe` resolves default PHP and the invoking user's configuration on each invocation. It does not make a project pin the system default or set machine-wide PHPRC.

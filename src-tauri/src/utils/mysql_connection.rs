@@ -1,15 +1,15 @@
-// Centralized MySQL/MariaDB client connection settings for LinuxDevStackBox.
+// Centralized MySQL client connection settings for LinuxDevStackBox.
 //
-// Bare `mysql -u root` can hit a system MariaDB instance via its socket.
-// Always pin to 127.0.0.1 / TCP and the user my.cnf defaults file.
+// A bare `mysql -u root` can hit a system-wide MySQL/MariaDB through its unix
+// socket. Always pin to 127.0.0.1 / TCP and the user my.cnf defaults file.
 
 use std::path::PathBuf;
 use std::process::Command;
 
 use crate::utils::mysql_credentials::read_stored_root_password;
 use crate::utils::paths::{
-    get_mysql_client_binary, get_mysqladmin_binary, get_mysqldump_binary, user_config_dir,
-    user_mysql_data_dir,
+    get_installation_path, get_mysql_client_exe, get_mysqladmin_exe, get_mysqld_exe,
+    get_mysqldump_exe, user_config_dir, user_mysql_data_dir,
 };
 use crate::utils::process::{create_hidden_command, is_our_process_running};
 
@@ -45,34 +45,45 @@ fn apply_connection(cmd: &mut Command, conn: &MysqlConnection) {
 }
 
 pub fn mysql_command() -> Result<Command, String> {
-    let mysql_path = get_mysql_client_binary()?;
+    let base = get_installation_path();
+    let mysql_path = get_mysql_client_exe(&base);
+    if !mysql_path.exists() {
+        return Err(format!("mysql not found at {}", mysql_path.display()));
+    }
     let conn = build_mysql_connection()?;
-    let mut cmd = create_hidden_command(mysql_path.as_os_str());
+    let mut cmd = create_hidden_command(&mysql_path.to_string_lossy());
     apply_connection(&mut cmd, &conn);
     Ok(cmd)
 }
 
 pub fn mysqldump_command() -> Result<Command, String> {
-    let dump_path = get_mysqldump_binary()?;
+    let base = get_installation_path();
+    let dump_path = get_mysqldump_exe(&base);
+    if !dump_path.exists() {
+        return Err(format!("mysqldump not found at {}", dump_path.display()));
+    }
     let conn = build_mysql_connection()?;
-    let mut cmd = create_hidden_command(dump_path.as_os_str());
+    let mut cmd = create_hidden_command(&dump_path.to_string_lossy());
     apply_connection(&mut cmd, &conn);
     Ok(cmd)
 }
 
 pub fn mysqladmin_command() -> Result<Command, String> {
-    let admin_path = get_mysqladmin_binary()?;
+    let base = get_installation_path();
+    let admin_path = get_mysqladmin_exe(&base);
+    if !admin_path.exists() {
+        return Err(format!("mysqladmin not found at {}", admin_path.display()));
+    }
     let conn = build_mysql_connection()?;
-    let mut cmd = create_hidden_command(admin_path.as_os_str());
+    let mut cmd = create_hidden_command(&admin_path.to_string_lossy());
     apply_connection(&mut cmd, &conn);
     Ok(cmd)
 }
 
 pub fn ensure_mysql_running() -> Result<(), String> {
-    let marker = user_config_dir().join("my.cnf");
-    if !is_our_process_running("mysqld", &marker)
-        && !is_our_process_running("mariadbd", &marker)
-    {
+    let base = get_installation_path();
+    let mysqld = get_mysqld_exe(&base);
+    if !is_our_process_running(&exe_name(&mysqld), &mysqld) {
         return Err(
             "LinuxDevStackBox MySQL is not running. Start MySQL from the Services page.".to_string(),
         );
@@ -80,13 +91,17 @@ pub fn ensure_mysql_running() -> Result<(), String> {
     Ok(())
 }
 
+fn exe_name(path: &std::path::Path) -> String {
+    path.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default()
+}
+
 /// Normalize MySQL datadir strings for comparison.
 /// Paths are never hardcoded per user; `verify_mysql_datadir` compares MySQL's
-/// `@@datadir` against `user_mysql_data_dir()` which resolves the XDG data
-/// root (or `LINUXDEVSTACKBOX_DATA_DIR`) at runtime.
+/// `@@datadir` against `user_mysql_data_dir()` which resolves the XDG data dir
+/// (or `LINUXDEVSTACKBOX_DATA_DIR`) at runtime.
 fn normalize_mysql_path(path: &str) -> String {
     let mut s = path.trim().trim_matches('"').to_string();
-    while s.ends_with('/') {
+    while s.len() > 1 && s.ends_with('/') {
         s.pop();
     }
     s
@@ -109,13 +124,18 @@ pub fn verify_mysql_datadir() -> Result<(), String> {
 
     let actual = normalize_mysql_path(&String::from_utf8_lossy(&output.stdout));
     let expected = normalize_mysql_path(&user_mysql_data_dir().to_string_lossy());
+    // Compare real paths too, so a symlinked home/data dir does not trip the check.
+    let canonical_matches = std::fs::canonicalize(&actual)
+        .ok()
+        .zip(std::fs::canonicalize(&expected).ok())
+        .map(|(a, b)| a == b)
+        .unwrap_or(false);
 
-    if actual != expected {
+    if actual != expected && !canonical_matches {
         return Err(format!(
             "Connected to the wrong MySQL instance (datadir: {}). \
-             Expected LinuxDevStackBox data at {}. Stop other MySQL installations \
-             (system services, XAMPP in /opt/lampp, Docker) or ensure the \
-             LinuxDevStackBox MySQL is running.",
+             Expected LinuxDevStackBox data at {}. Stop other MySQL/MariaDB servers \
+             (system service, Docker) or ensure LinuxDevStackBox MySQL is running.",
             String::from_utf8_lossy(&output.stdout).trim(),
             user_mysql_data_dir().display()
         ));
@@ -134,10 +154,9 @@ pub fn prepare_mysql_client() -> Result<(), String> {
 #[cfg(test)]
 mod tests {
     use super::normalize_mysql_path;
-    use crate::utils::paths::user_mysql_data_dir;
 
     #[test]
-    fn trailing_slashes_are_ignored() {
+    fn strips_trailing_slashes() {
         assert_eq!(
             normalize_mysql_path("/home/u/.local/share/linuxdevstackbox/mysql-data/"),
             normalize_mysql_path("/home/u/.local/share/linuxdevstackbox/mysql-data")
@@ -145,12 +164,12 @@ mod tests {
     }
 
     #[test]
-    fn user_data_dir_matches_forward_slash_mysql_output() {
-        let expected = user_mysql_data_dir();
-        let forward = format!("{}/", expected.to_string_lossy());
-        assert_eq!(
-            normalize_mysql_path(&forward),
-            normalize_mysql_path(&expected.to_string_lossy())
-        );
+    fn strips_quotes_and_whitespace() {
+        assert_eq!(normalize_mysql_path("  \"/data/mysql\"\n"), "/data/mysql");
+    }
+
+    #[test]
+    fn root_is_preserved() {
+        assert_eq!(normalize_mysql_path("/"), "/");
     }
 }

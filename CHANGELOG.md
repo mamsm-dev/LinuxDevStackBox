@@ -1,65 +1,21 @@
 # Changelog
 
-All notable changes to LinuxDevStackBox are documented in this file.
+All notable changes to LinuxDevStackBox (a Linux port of DevStackBox) are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
-## [0.1.26] - 2026-10-31
-
-### Fixed
-
-- Rust linking in the Arch package build: the unused `rustls-tls` feature pulled an entire rustls/ring TLS stack alongside the native-tls backend the application actually uses, producing undefined `ring_core_*` symbols at link time. The feature (and the whole stack) is removed; the HTTPS certificate probe is unaffected.
-- Debian package validation: obsolete `policykit-1` dependency replaced with `polkitd`, `lsb-base` declared, a real manual page is shipped, the changelog and extended description follow Debian formatting, and the phpMyAdmin embedded-JavaScript warnings carry a justified lintian override.
-- Fedora release job discovers the application RPM (rpmbuild places output under `dist/x86_64/`, not `dist/RPMS/x86_64/`) instead of failing after a successful build.
-- Package validation listings (`dpkg-deb --contents`, `pacman -Qlp`, `rpm -qpl`) are captured to files before grepping, so an early-exiting `grep -q` can no longer SIGPIPE-kill the producer ("tar: stdout: write error").
-
-## [0.1.25] - 2026-10-31
-
-### Fixed
-
-- Arch packaging job installs the declared runtime dependency stack (apache, mariadb, mariadb-clients, php, php-cgi, openssl - names verified against the official repositories) and builds with `makepkg --syncdeps` as a non-root builder with pacman-only sudo.
-- Debian packaging declares exactly one debhelper compatibility level (`debhelper-compat (= 13)`); the obsolete `debian/compat` file was removed.
-- The Arch, Debian and Fedora package builds use `cargo build --locked` instead of `--frozen`, enforcing the committed Cargo.lock while allowing crates to resolve in fresh build environments.
-
-## [0.1.24] - 2026-10-31
-
-LinuxDevStackBox 0.1.24 continues the Linux-only application line (first shipped as v0.1.22): the Windows platform is removed and the application is built around the Apache, MariaDB/MySQL and PHP packages of Arch, Debian and Fedora.
-
-### Added
-
-- Automated release pipeline: pushing a `v*` tag makes GitHub Actions build the Arch `.pkg.tar.zst`, Debian `.deb`, Fedora `.rpm` and a portable AppImage in their native environments, validate each with the distribution's own tools, and publish a GitHub Release with a `SHA256SUMS` file covering all four assets.
-- Debian packaging directory (`packaging/debian`: control, debhelper rules, changelog, DEP-5 copyright) and Fedora RPM spec (`packaging/fedora/linuxdevstackbox.spec`) building the application from source with `dpkg-buildpackage` and `rpmbuild`.
-- A packaging metadata verifier (`scripts/verify-packaging-metadata.mjs`) that fails CI when package.json, tauri.conf.json, Cargo.toml, Cargo.lock, PKGBUILD, the Debian changelog, the RPM spec and a pushed release tag disagree on the version.
-- CI workflow with frontend/Rust checks, packaging configuration lint (Debian changelog/control parsing, RPM spec parsing, PKGBUILD source-info generation) and build jobs per distribution container. The Windows platform is completely removed; the application is rebuilt around the Apache, MariaDB/MySQL and PHP packages of Arch, Debian and Fedora.
-
-### Added
-
-- Linux-native service management: Apache, MySQL/MariaDB and PHP binaries are resolved from distribution packages, with per-distribution install guidance when missing.
-- Native packages for all three supported families: Arch `PKGBUILD` (`linuxdevstackbox`), Debian `.deb` and Fedora `.rpm`, with declared runtime dependencies, desktop entry and icons.
-- Trusted local HTTPS rebuilt on the system `openssl`: per-user CA generation, SAN-signed site certificates, and trust installation into the distribution CA store via a single polkit prompt (Arch/Debian/Fedora paths).
-- `/etc/hosts` management via a managed block with polkit elevation for the single file change.
-- XDG Base Directory layout: configuration in `~/.config/linuxdevstackbox`, data (logs, MySQL data, www, backups, phpMyAdmin copy) in `~/.local/share/linuxdevstackbox`, overridable with `LINUXDEVSTACKBOX_DATA_DIR`.
-- `/proc`-based process ownership: services are identified by executable name plus their generated configuration, so system Apache/MySQL instances are never touched; children run in isolated process groups.
-- XDG autostart support and an integrated terminal that spawns the user's login shell.
-- AppImage as a fourth release artifact, built with the Tauri bundler.
-
 ### Changed
 
-- The app runs entirely as the invoking user; the default Apache port is now 8080 (unprivileged) instead of 80.
-- PHP is the distribution runtime (8.2 minimum): the Windows download feed, version switching and junction handling are replaced by system package detection; extensions are managed in the generated per-user php.ini.
-- The in-app updater is now check-only: it reports newer releases and points at the package-manager upgrade instead of self-installing.
-- phpMyAdmin is cloned into the writable user data directory on first run.
-- MySQL root credentials are stored in a 0600 file under the XDG config directory.
-- Debian build dependencies declare only apt-providable packages; the Node.js >= 20 and Rust >= 1.77.2 toolchains are documented environment requirements (packaging/debian/README.source).
+- Renamed the application to **LinuxDevStackBox** and ported it from Windows to Linux (AppImage target).
+- Services use bundled binaries when present, otherwise the system Apache, MySQL/MariaDB and PHP packages.
+- Paths follow XDG: data in `~/.local/share/linuxdevstackbox`, web root in `~/LinuxDevStackBox/www`.
+- Hosts changes and privileged actions use pkexec; local CA trust uses the Linux trust store.
+- PHP versions come from system packages instead of windows.php.net downloads.
+- Terminal uses bash; Windows-only shells, registry autostart and NSIS installer wording removed.
 
-### Removed
-
-- All Windows support: bundled Apache Lounge/MySQL/PHP/mkcert binaries, NSIS and WiX installers, Chocolatey and WinGet manifests, PowerShell release and test scripts, the `php.exe` CLI launcher, and Windows registry/DPAPI/UAC integration.
-
-## [0.1.22]
-
+## [0.1.22] - 2026-10-29
 
 ### Changed
 
@@ -71,11 +27,6 @@ LinuxDevStackBox 0.1.24 continues the Linux-only application line (first shipped
 - Share stable PHP/configuration reads across tabs, deduplicate concurrent calls and invalidate affected data after changes. Explicit Refresh/Reload bypass cached reads; live service, database and log checks remain active.
 
 **Installer SHA-256:** `D9F54708F067AA7CA73C6C4348E49A09EAB2B2E70544C4C5ACA0E9DFFCFADB3B`
-
-**Package SHA-256:**
-
-- **LinuxDevStackBox_0.1.22_amd64.deb SHA-256:** `4EEA94D59461C02E489CFA6ECAAA4F415AEF48D55D5D9BABD1F69CE5628DD615`
-- **LinuxDevStackBox-0.1.22-1.x86_64.rpm SHA-256:** `1A9B019D9240BE9DC4E2B2007F2FF8C8F183926E8022785807BA6F2DDA8D68B1`
 
 ## [0.1.21] - 2026-10-28
 
@@ -96,8 +47,8 @@ LinuxDevStackBox 0.1.24 continues the Linux-only application line (first shipped
 - Show virtual-host load errors and configuration loading/failure states; translate error recovery and add a page-not-found screen.
 - Share bulk-service controls across Dashboard and Services, distinguish partially running status, and remove obsolete frontend types, assets and page forwarding files.
 - Keep browser Print available on Ctrl+P (browser command palette: Ctrl+Shift+P); retain Ctrl+P in the desktop app.
-- Import ordinary ZIP backups containing one root-level SQL file without requiring a LinuxDevStackBox manifest. Preserve package checksum validation and archive safety limits.
-- Determine import target controls from the inspected archive type, clear inherited targets for LinuxDevStackBox packages, and reset stale review errors.
+- Import ordinary ZIP backups containing one root-level SQL file without requiring a DevStackBox manifest. Preserve package checksum validation and archive safety limits.
+- Determine import target controls from the inspected archive type, clear inherited targets for DevStackBox packages, and reset stale review errors.
 
 **Installer SHA-256:** `845B3732973E0D0E02BFD5255563F87B71616CD5893DD81A3EDD0DF1FDAC1FC4`
 
@@ -131,7 +82,7 @@ LinuxDevStackBox 0.1.24 continues the Linux-only application line (first shipped
 
 - **Database workspace** with **Databases**, **Users**, and **Import & Export** tabs: database details (overview, tables and views, access, backups), bulk selection, and visible manage, backup, export, and import actions.
 - SQL and GZIP export and import with risk review, sequential batches, shared activity history, and cancellation.
-- LinuxDevStackBox ZIP packages, saved backup records with integrity checks, reviewed restore, and full-server backup from the workspace.
+- DevStackBox ZIP packages, saved backup records with integrity checks, reviewed restore, and full-server backup from the workspace.
 - Database-level permissions editor and clearer MySQL account controls; improved stopped-MySQL and stale-cache empty states.
 
 ### Changed
@@ -190,7 +141,7 @@ LinuxDevStackBox 0.1.24 continues the Linux-only application line (first shipped
 
 - Show branch names and full installed/downloadable PHP versions separately in PHP Version Manager, matching the dashboard's branch and patch distinction.
 - Offer patch updates for already-installed branches, including the active runtime. Preserve php.ini, stage replacements, and restore the previous runtime if publishing the replacement fails.
-- Require LinuxDevStackBox Apache and affected PHP processes to be stopped for runtime updates; prevent Apache startup during the replacement.
+- Require DevStackBox Apache and affected PHP processes to be stopped for runtime updates; prevent Apache startup during the replacement.
 - Keep installed patch versions and security warnings visible when release checks fail. Reject release builds with an outdated bundled PHP runtime.
 
 ### Upgrade notes
@@ -319,7 +270,7 @@ LinuxDevStackBox 0.1.24 continues the Linux-only application line (first shipped
 
 ### Added
 
-- New LinuxDevStackBox branding and logo across the app, installer, and website
+- New DevStackBox branding and logo across the app, installer, and website
 - One-click in-place upgrade dialog when installing a newer version over an existing install
 - Automatic Apache and MySQL shutdown before upgrade file copy
 - `www` folder preservation during upgrade when websites already exist

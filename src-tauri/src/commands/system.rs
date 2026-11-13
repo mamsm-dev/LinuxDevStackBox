@@ -2,14 +2,13 @@
 
 use std::collections::HashMap;
 use std::env;
-use std::path::PathBuf;
 
 use crate::commands::apache::{start_apache, stop_apache};
 use crate::commands::mysql::{start_mysql, stop_mysql};
 use crate::utils::app_settings::{read_app_settings, write_app_settings, AppSettings};
 use crate::utils::paths::{
-    ensure_user_data_dirs, get_apache_binary, get_php_binary, get_user_data_root,
-    get_user_config_root, user_www_dir,
+    active_php_dir, ensure_user_data_dirs, get_apache_exe, get_installation_path, get_mysqld_exe,
+    get_user_data_root, php_cli_in, user_config_dir, user_php_runtime_root, user_www_dir,
 };
 use crate::utils::process::create_hidden_command;
 
@@ -17,10 +16,16 @@ use crate::utils::process::create_hidden_command;
 pub async fn check_binaries() -> Result<HashMap<String, bool>, String> {
     let mut binaries = HashMap::new();
 
-    binaries.insert("apache".to_string(), get_apache_binary().is_ok());
-    binaries.insert("mysql".to_string(), crate::utils::paths::get_mysqld_binary().is_ok());
-    binaries.insert("php".to_string(), get_php_binary().is_ok());
-    binaries.insert("php-cgi".to_string(), crate::utils::paths::get_php_cgi_binary().is_ok());
+    let base_path = get_installation_path();
+
+    let mysql_path = get_mysqld_exe(&base_path);
+    binaries.insert("mysql".to_string(), mysql_path.exists());
+
+    let apache_path = get_apache_exe(&base_path);
+    binaries.insert("apache".to_string(), apache_path.exists());
+
+    let php_path = php_cli_in(&active_php_dir());
+    binaries.insert("php8.3".to_string(), php_path.exists());
 
     Ok(binaries)
 }
@@ -29,36 +34,25 @@ pub async fn check_binaries() -> Result<HashMap<String, bool>, String> {
 pub async fn debug_paths() -> Result<HashMap<String, String>, String> {
     let mut paths = HashMap::new();
 
+    let base_path = get_installation_path();
+
     paths.insert(
         "current_dir".to_string(),
         env::current_dir().unwrap_or_default().display().to_string(),
     );
-    paths.insert(
-        "data_root".to_string(),
-        get_user_data_root().display().to_string(),
-    );
-    paths.insert(
-        "config_root".to_string(),
-        get_user_config_root().display().to_string(),
-    );
+    paths.insert("base_path".to_string(), base_path.display().to_string());
 
-    for (key, result) in [
-        ("apache_path", get_apache_binary()),
-        ("php_path", get_php_binary()),
-        ("php_cgi_path", crate::utils::paths::get_php_cgi_binary()),
-        ("mysql_path", crate::utils::paths::get_mysqld_binary().map(|(p, _)| p)),
-    ] {
-        match result {
-            Ok(path) => {
-                paths.insert(format!("{key}_exists"), "true".to_string());
-                paths.insert(key.to_string(), path.display().to_string());
-            }
-            Err(error) => {
-                paths.insert(format!("{key}_exists"), "false".to_string());
-                paths.insert(key.to_string(), error);
-            }
-        }
-    }
+    let mysql_path = get_mysqld_exe(&base_path);
+    paths.insert("mysql_path".to_string(), mysql_path.display().to_string());
+    paths.insert("mysql_exists".to_string(), mysql_path.exists().to_string());
+
+    let apache_path = get_apache_exe(&base_path);
+    paths.insert("apache_path".to_string(), apache_path.display().to_string());
+    paths.insert("apache_exists".to_string(), apache_path.exists().to_string());
+
+    let php_path = php_cli_in(&active_php_dir());
+    paths.insert("php_path".to_string(), php_path.display().to_string());
+    paths.insert("php_exists".to_string(), php_path.exists().to_string());
 
     Ok(paths)
 }
@@ -74,7 +68,24 @@ pub async fn debug_installation() -> Result<HashMap<String, String>, String> {
         }
     }
 
-    let config_dir = get_user_config_root();
+    let install_path = get_installation_path();
+    debug_info.insert(
+        "detected_install_path".to_string(),
+        install_path.display().to_string(),
+    );
+
+    let apache_bin = get_apache_exe(&install_path);
+    let mysql_bin = get_mysqld_exe(&install_path);
+    let php_bin = php_cli_in(&active_php_dir());
+    let phpmyadmin_index = install_path.join("phpmyadmin").join("index.php");
+
+    debug_info.insert(
+        "apache_bin_path".to_string(),
+        apache_bin.display().to_string(),
+    );
+    debug_info.insert("apache_exists".to_string(), apache_bin.exists().to_string());
+
+    let config_dir = user_config_dir();
     let httpd_conf = config_dir.join("httpd.conf");
     let phpmyadmin_conf = config_dir.join("phpmyadmin.conf");
 
@@ -94,24 +105,12 @@ pub async fn debug_installation() -> Result<HashMap<String, String>, String> {
         phpmyadmin_conf.exists().to_string(),
     );
 
-    for (key, result) in [
-        ("apache_bin_path", get_apache_binary()),
-        ("php_bin_path", get_php_binary()),
-        ("mysql_bin_path", crate::utils::paths::get_mysqld_binary().map(|(p, _)| p)),
-    ] {
-        match result {
-            Ok(path) => {
-                debug_info.insert(format!("{key}_exists"), "true".to_string());
-                debug_info.insert(key.to_string(), path.display().to_string());
-            }
-            Err(error) => {
-                debug_info.insert(format!("{key}_exists"), "false".to_string());
-                debug_info.insert(key.to_string(), error);
-            }
-        }
-    }
+    debug_info.insert("mysql_bin_path".to_string(), mysql_bin.display().to_string());
+    debug_info.insert("mysql_exists".to_string(), mysql_bin.exists().to_string());
 
-    let phpmyadmin_index = crate::utils::paths::phpmyadmin_dir().join("index.php");
+    debug_info.insert("php_bin_path".to_string(), php_bin.display().to_string());
+    debug_info.insert("php_exists".to_string(), php_bin.exists().to_string());
+
     debug_info.insert(
         "phpmyadmin_path".to_string(),
         phpmyadmin_index.display().to_string(),
@@ -121,7 +120,18 @@ pub async fn debug_installation() -> Result<HashMap<String, String>, String> {
         phpmyadmin_index.exists().to_string(),
     );
 
-    let mysql_config = get_user_config_root().join("my.cnf");
+    let apache_config = user_config_dir().join("httpd.conf");
+    let mysql_config = user_config_dir().join("my.cnf");
+
+    debug_info.insert(
+        "apache_config_path".to_string(),
+        apache_config.display().to_string(),
+    );
+    debug_info.insert(
+        "apache_config_exists".to_string(),
+        apache_config.exists().to_string(),
+    );
+
     debug_info.insert(
         "mysql_config_path".to_string(),
         mysql_config.display().to_string(),
@@ -130,6 +140,22 @@ pub async fn debug_installation() -> Result<HashMap<String, String>, String> {
         "mysql_config_exists".to_string(),
         mysql_config.exists().to_string(),
     );
+
+    let apache_dir_readable = install_path.join("apache").exists();
+    let mysql_dir_readable = install_path.join("mysql").exists();
+
+    debug_info.insert(
+        "apache_dir_readable".to_string(),
+        apache_dir_readable.to_string(),
+    );
+    debug_info.insert(
+        "mysql_dir_readable".to_string(),
+        mysql_dir_readable.to_string(),
+    );
+
+    if let Ok(cwd) = env::current_dir() {
+        debug_info.insert("current_working_dir".to_string(), cwd.display().to_string());
+    }
 
     Ok(debug_info)
 }
@@ -179,8 +205,16 @@ pub async fn restart_all_services() -> Result<String, String> {
 
 #[tauri::command]
 pub async fn test_apache_config() -> Result<String, String> {
-    let binary = get_apache_binary()?;
-    let config_path = get_user_config_root().join("httpd.conf");
+    let base_path = get_installation_path();
+    let apache_path = get_apache_exe(&base_path);
+    let config_path = user_config_dir().join("httpd.conf");
+
+    if !apache_path.exists() {
+        return Err(format!(
+            "Apache binary not found at: {}",
+            apache_path.display()
+        ));
+    }
 
     if !config_path.exists() {
         return Err(format!(
@@ -189,7 +223,7 @@ pub async fn test_apache_config() -> Result<String, String> {
         ));
     }
 
-    let mut test_cmd = create_hidden_command(binary.as_os_str());
+    let mut test_cmd = create_hidden_command(&apache_path.to_string_lossy());
     test_cmd
         .arg("-f")
         .arg(&config_path)
@@ -206,29 +240,37 @@ pub async fn test_apache_config() -> Result<String, String> {
                 Ok(format!(
                     "Apache config test PASSED\nOutput: {}\nPath used: {}",
                     stdout,
-                    binary.display()
+                    apache_path.display()
                 ))
             } else {
                 Err(format!(
                     "Apache config test FAILED\nError: {}\nOutput: {}\nPath used: {}",
                     stderr,
                     stdout,
-                    binary.display()
+                    apache_path.display()
                 ))
             }
         }
         Err(e) => Err(format!(
             "Failed to run Apache config test: {}\nPath: {}",
             e,
-            binary.display()
+            apache_path.display()
         )),
     }
 }
 
 #[tauri::command]
 pub async fn test_mysql_config() -> Result<String, String> {
-    let (mysqld_path, _) = crate::utils::paths::get_mysqld_binary()?;
-    let config_path = get_user_config_root().join("my.cnf");
+    let base_path = get_installation_path();
+    let mysqld_path = get_mysqld_exe(&base_path);
+    let config_path = user_config_dir().join("my.cnf");
+
+    if !mysqld_path.exists() {
+        return Err(format!(
+            "MySQL binary not found at: {}",
+            mysqld_path.display()
+        ));
+    }
 
     if !config_path.exists() {
         return Err(format!(
@@ -237,11 +279,9 @@ pub async fn test_mysql_config() -> Result<String, String> {
         ));
     }
 
-    // MariaDB has no --validate-config; start it against a throwaway port
-    // guard instead. --help validates option syntax on both flavors.
-    let mut cmd = create_hidden_command(mysqld_path.as_os_str());
+    let mut cmd = create_hidden_command(&mysqld_path.to_string_lossy());
     cmd.arg(format!("--defaults-file={}", config_path.display()))
-        .arg("--help")
+        .arg("--validate-config")
         .stdout(std::process::Stdio::piped())
         .stderr(std::process::Stdio::piped());
 
@@ -249,14 +289,16 @@ pub async fn test_mysql_config() -> Result<String, String> {
         Ok(output) => {
             let stdout = String::from_utf8_lossy(&output.stdout);
             let stderr = String::from_utf8_lossy(&output.stderr);
-            let text = if stderr.trim().is_empty() { stdout.trim() } else { stderr.trim() };
-            let rejected = text.contains("unknown variable")
-                || text.contains("unknown option")
-                || text.contains("Syntax error");
-            if output.status.success() && !rejected {
-                Ok(format!("MySQL config validation PASSED\nOutput: {}", text))
+            if output.status.success() {
+                Ok(format!(
+                    "MySQL config validation PASSED\nOutput: {}",
+                    if stderr.trim().is_empty() { stdout.trim() } else { stderr.trim() }
+                ))
             } else {
-                Err(format!("MySQL config validation FAILED\nError: {}", text))
+                Err(format!(
+                    "MySQL config validation FAILED\nError: {}",
+                    if stderr.trim().is_empty() { stdout.trim() } else { stderr.trim() }
+                ))
             }
         }
         Err(e) => Err(format!("Failed to run MySQL config validation: {}", e)),
@@ -265,7 +307,8 @@ pub async fn test_mysql_config() -> Result<String, String> {
 
 #[tauri::command]
 pub async fn create_directory_structure() -> Result<String, String> {
-    // Ensure all user-data directories exist.
+    // Ensure all user-data directories exist (Phase 1.8).
+    // Binaries are not created here; they ship inside the install dir.
     ensure_user_data_dirs();
 
     let www_path = user_www_dir();
@@ -285,51 +328,61 @@ pub async fn create_directory_structure() -> Result<String, String> {
     Ok("Directory structure and default web files created successfully".to_string())
 }
 
-/// XDG autostart desktop entry used for "launch LinuxDevStackBox at login".
-/// `~/.config/autostart` is honored by KDE Plasma, GNOME and most other
-/// desktop environments, and requires no special privileges.
-fn autostart_desktop_path() -> PathBuf {
-    let config_base = env::var_os("XDG_CONFIG_HOME")
-        .map(PathBuf::from)
-        .filter(|p| p.is_absolute())
-        .unwrap_or_else(|| {
-            PathBuf::from(env::var_os("HOME").unwrap_or_default().to_string_lossy().into_owned())
-                .join(".config")
-        });
-    config_base.join("autostart").join(format!("{}.desktop", crate::utils::paths::APP_ID))
+/// Autostart is an XDG autostart entry in `~/.config/autostart/`, which needs
+/// no elevated rights and is honoured by all major desktop environments.
+const AUTOSTART_FILE: &str = "linuxdevstackbox.desktop";
+
+fn autostart_path() -> Result<std::path::PathBuf, String> {
+    let base = env::var_os("XDG_CONFIG_HOME")
+        .filter(|v| !v.is_empty())
+        .map(std::path::PathBuf::from)
+        .or_else(|| env::var_os("HOME").map(|h| std::path::PathBuf::from(h).join(".config")))
+        .ok_or_else(|| "Cannot determine the XDG config directory".to_string())?;
+    Ok(base.join("autostart").join(AUTOSTART_FILE))
+}
+
+/// Path to launch at login: the AppImage file itself when running from one
+/// (the executable inside the mount point disappears after exit).
+fn autostart_exec() -> Result<String, String> {
+    let exe = match env::var_os("APPIMAGE").filter(|v| !v.is_empty()) {
+        Some(p) => std::path::PathBuf::from(p),
+        None => env::current_exe().map_err(|e| format!("Failed to resolve current exe: {}", e))?,
+    };
+    // Desktop Entry spec: quote the Exec path and escape \ " ` $ inside it.
+    let escaped = exe
+        .display()
+        .to_string()
+        .replace('\\', "\\\\")
+        .replace('"', "\\\"")
+        .replace('`', "\\`")
+        .replace('$', "\\$");
+    Ok(format!("\"{}\"", escaped))
 }
 
 #[tauri::command]
 pub async fn get_autostart() -> Result<bool, String> {
-    Ok(autostart_desktop_path().is_file())
+    Ok(autostart_path()?.is_file())
 }
 
 #[tauri::command]
 pub async fn set_autostart(enabled: bool) -> Result<bool, String> {
-    let path = autostart_desktop_path();
-    if !enabled {
-        // Removing a non-existent entry counts as already-disabled.
-        match std::fs::remove_file(&path) {
-            Ok(()) => return Ok(false),
-            Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(false),
-            Err(e) => return Err(format!("Failed to remove autostart entry: {}", e)),
+    let path = autostart_path()?;
+    if enabled {
+        let entry = format!(
+            "[Desktop Entry]\nType=Application\nName=LinuxDevStackBox\nComment=Local PHP development environment\nExec={}\nTerminal=false\nX-GNOME-Autostart-enabled=true\n",
+            autostart_exec()?
+        );
+        if let Some(parent) = path.parent() {
+            std::fs::create_dir_all(parent)
+                .map_err(|e| format!("Failed to create autostart directory: {}", e))?;
         }
+        std::fs::write(&path, entry)
+            .map_err(|e| format!("Failed to write autostart entry: {}", e))?;
+    } else if path.exists() {
+        std::fs::remove_file(&path)
+            .map_err(|e| format!("Failed to remove autostart entry: {}", e))?;
     }
-    let exe = env::current_exe()
-        .map_err(|e| format!("Failed to resolve current executable: {}", e))?;
-    let entry = format!(
-        "[Desktop Entry]\nType=Application\nVersion=1.0\nName=LinuxDevStackBox\n\
-         Comment=Local PHP development stack\nExec={}\nIcon={}\nTerminal=false\n\
-         Categories=Development;WebDevelopment;\nX-GNOME-Autostart-enabled=true\n",
-        exe.display(),
-        crate::utils::paths::APP_ID
-    );
-    if let Some(parent) = path.parent() {
-        std::fs::create_dir_all(parent).map_err(|e| e.to_string())?;
-    }
-    std::fs::write(&path, entry)
-        .map_err(|e| format!("Failed to write autostart entry: {}", e))?;
-    Ok(true)
+    Ok(enabled)
 }
 
 #[tauri::command]
@@ -348,7 +401,7 @@ fn read_version(exe: &std::path::Path, arg: &str) -> Option<String> {
     if !exe.exists() {
         return None;
     }
-    let output = create_hidden_command(exe.as_os_str())
+    let output = create_hidden_command(&exe.to_string_lossy())
         .arg(arg)
         .output()
         .ok()?;
@@ -356,44 +409,52 @@ fn read_version(exe: &std::path::Path, arg: &str) -> Option<String> {
     if text.trim().is_empty() {
         text = String::from_utf8_lossy(&output.stderr).to_string();
     }
+    // Most tools return multi-line banners; the first non-empty line is enough.
     text.lines()
         .map(|l| l.trim())
         .find(|l| !l.is_empty())
         .map(|s| s.to_string())
 }
 
-fn os_pretty_name() -> String {
-    std::fs::read_to_string("/etc/os-release")
-        .ok()
-        .and_then(|content| {
-            content.lines().find_map(|line| {
-                line.strip_prefix("PRETTY_NAME=")
-                    .map(|v| v.trim_matches('"').to_string())
-            })
-        })
-        .unwrap_or_else(|| "Linux".to_string())
-}
-
 #[tauri::command]
 pub async fn get_system_info() -> Result<crate::types::SystemInfo, String> {
-    let httpd = get_apache_binary().ok();
-    let mysqld = crate::utils::paths::get_mysqld_binary().ok().map(|(p, _)| p);
-
+    let base_path = get_installation_path();
+    let httpd = get_apache_exe(&base_path);
+    let mysqld = get_mysqld_exe(&base_path);
     let mut php_versions: Vec<String> = Vec::new();
-    let php_status = crate::commands::php::get_php_status().await.ok();
-    if let Some(version) = php_status.and_then(|s| s.version) {
-        let branch: String = version.split('.').take(2).collect::<Vec<_>>().join(".");
-        php_versions.push(branch);
+    for root in [user_php_runtime_root(), base_path.join("php")] {
+        if let Ok(entries) = std::fs::read_dir(&root) {
+            for entry in entries.flatten() {
+                if entry.path().is_dir() {
+                    if let Some(name) = entry.file_name().to_str() {
+                        if name != "current" && !php_versions.iter().any(|v| v == name) {
+                            php_versions.push(name.to_string());
+                        }
+                    }
+                }
+            }
+        }
     }
+    php_versions.sort();
+
+    // Host distribution from /etc/os-release (PRETTY_NAME).
+    let os_version = std::fs::read_to_string("/etc/os-release")
+        .ok()
+        .and_then(|c| {
+            c.lines()
+                .find_map(|l| l.strip_prefix("PRETTY_NAME="))
+                .map(|v| v.trim().trim_matches('"').to_string())
+        })
+        .unwrap_or_else(|| "Linux".to_string());
 
     Ok(crate::types::SystemInfo {
         os: std::env::consts::OS.to_string(),
         arch: std::env::consts::ARCH.to_string(),
-        os_version: os_pretty_name(),
+        os_version,
         app_version: env!("CARGO_PKG_VERSION").to_string(),
         tauri_version: "2.x".to_string(),
-        apache_version: httpd.and_then(|p| read_version(&p, "-v")),
-        mysql_version: mysqld.and_then(|p| read_version(&p, "--version")),
+        apache_version: read_version(&httpd, "-v"),
+        mysql_version: read_version(&mysqld, "--version"),
         php_versions,
     })
 }
@@ -464,7 +525,11 @@ pub async fn export_diagnostics_bundle() -> Result<String, String> {
         serde_json::Value::String(env!("CARGO_PKG_VERSION").to_string()),
     );
     payload.insert(
-        "dataRoot".into(),
+        "installPath".into(),
+        serde_json::Value::String(get_installation_path().display().to_string()),
+    );
+    payload.insert(
+        "userDataRoot".into(),
         serde_json::Value::String(root.display().to_string()),
     );
     payload.insert(

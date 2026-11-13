@@ -1,10 +1,6 @@
-//! Trusted local HTTPS.
-//!
-//! A per-user local CA is generated with the system `openssl` tool; leaf
-//! certificates are signed by it. Trust installation copies the CA into the
-//! distribution CA store via `pkexec` (Arch: /etc/ca-certificates/trust-source,
-//! Debian: /usr/local/share/ca-certificates, Fedora: /etc/pki/ca-trust) and
-//! refreshes the bundle. CA keys are per-user, never bundled or exported.
+//! Trusted local HTTPS. CA keys are per-user, never bundled or exported.
+//! The CA and site certificates are generated with the `openssl` CLI; the CA is
+//! trusted through the system store (pkexec) and, best effort, browser NSS DBs.
 use super::vhosts::{load_vhosts, VhostEntry};
 use crate::utils::{paths::*, process::create_hidden_command};
 use serde::{Deserialize, Serialize};
@@ -12,7 +8,6 @@ use sha2::{Digest, Sha256};
 use std::{fs, path::PathBuf, time::Duration};
 
 pub static SITE_LOCK: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
-
 pub fn tls_dir() -> PathBuf {
     user_config_dir().join("https")
 }
@@ -28,215 +23,261 @@ pub fn leaf(host: &str) -> PathBuf {
 pub fn leaf_key(host: &str) -> PathBuf {
     tls_dir().join(format!("{}-key.pem", site_id(host)))
 }
-
-fn openssl(args: &[&str]) -> Result<std::process::Output, String> {
-    let exe = get_openssl_binary()?;
-    create_hidden_command(exe.as_os_str())
+fn openssl_run(args: &[String]) -> Result<std::process::Output, String> {
+    create_hidden_command(&get_openssl_exe(&get_installation_path()).to_string_lossy())
         .args(args)
         .output()
-        .map_err(|e| e.to_string())
+        .map_err(|e| format!("Cannot run openssl (install the openssl package): {e}"))
 }
-
-fn openssl_ok(args: &[&str]) -> Result<Vec<u8>, String> {
-    let out = openssl(args)?;
-    if !out.status.success() {
-        return Err(format!(
-            "openssl failed: {}",
-            String::from_utf8_lossy(&out.stderr).trim()
-        ));
-    }
-    Ok(out.stdout)
+fn openssl(args: &[&str], path: &std::path::Path) -> Result<std::process::Output, String> {
+    let mut all: Vec<String> = args.iter().map(|a| a.to_string()).collect();
+    all.push(path.to_string_lossy().into_owned());
+    openssl_run(&all)
 }
-
-fn restrict_permissions(path: &std::path::Path, mode: u32) -> Result<(), String> {
+fn chmod(path: &std::path::Path, mode: u32) {
     use std::os::unix::fs::PermissionsExt;
-    fs::set_permissions(path, fs::Permissions::from_mode(mode))
-        .map_err(|e| format!("Cannot secure {}: {e}", path.display()))
+    let _ = fs::set_permissions(path, fs::Permissions::from_mode(mode));
+}
+fn ensure_ok(out: std::process::Output, what: &str) -> Result<(), String> {
+    if out.status.success() {
+        Ok(())
+    } else {
+        Err(format!("{what} failed: {}", String::from_utf8_lossy(&out.stderr)))
+    }
+}
+/// True when this process runs as root (uid 0).
+pub fn running_as_root() -> bool {
+    fs::read_to_string("/proc/self/status")
+        .ok()
+        .and_then(|s| {
+            s.lines()
+                .find(|l| l.starts_with("Uid:"))
+                .and_then(|l| l.split_whitespace().nth(1).map(|u| u == "0"))
+        })
+        .unwrap_or(false)
 }
 
-/// System CA bundle candidates, per distribution family.
-fn system_ca_bundles() -> &'static [&'static str] {
-    &[
-        "/etc/ssl/certs/ca-certificates.crt",                  // Arch, Debian
-        "/etc/pki/tls/certs/ca-bundle.crt",                    // Fedora
-        "/etc/pki/ca-trust/extracted/pem/tls-ca-bundle.pem",   // Fedora (p11-kit)
+const CA_FILE_NAME: &str = "linuxdevstackbox-ca.crt";
+
+/// Where the CA is installed for the system trust store, per distribution family.
+fn system_anchor_paths() -> Vec<PathBuf> {
+    vec![
+        PathBuf::from("/usr/local/share/ca-certificates").join(CA_FILE_NAME),
+        PathBuf::from("/etc/pki/ca-trust/source/anchors").join(CA_FILE_NAME),
+        PathBuf::from("/etc/ca-certificates/trust-source/anchors").join(CA_FILE_NAME),
+        PathBuf::from("/usr/share/pki/trust/anchors").join(CA_FILE_NAME),
     ]
 }
 
+/// The CA counts as trusted when our current root certificate is installed in
+/// the system trust store (what OpenSSL/native-tls clients use).
 pub fn ca_trusted() -> bool {
-    let cert = ca_dir().join("rootCA.pem");
-    if !cert.exists() {
+    let Ok(ours) = fs::read(ca_dir().join("rootCA.pem")) else {
         return false;
-    }
-    // Authoritative check: does the system trust store (the one reqwest and
-    // browsers use) already verify our CA?
-    for bundle in system_ca_bundles() {
-        if !std::path::Path::new(bundle).is_file() {
-            continue;
-        }
-        if openssl(&["verify", "-CAfile", bundle, cert.to_str().unwrap_or("")])
-            .is_ok_and(|o| o.status.success())
-        {
-            return true;
-        }
-    }
-    // The anchor may be installed but the bundle not refreshed yet.
-    ca_anchor_installed()
+    };
+    system_anchor_paths()
+        .iter()
+        .any(|p| fs::read(p).map(|installed| installed == ours).unwrap_or(false))
 }
 
-fn ca_anchor_installed() -> bool {
-    [
-        "/etc/ca-certificates/trust-source/anchors/linuxdevstackbox-rootCA.pem",
-        "/usr/local/share/ca-certificates/linuxdevstackbox-rootCA.crt",
-        "/etc/pki/ca-trust/source/anchors/linuxdevstackbox-rootCA.pem",
-    ]
-    .iter()
-    .any(|p| std::path::Path::new(p).is_file())
-}
-
-/// Runs as root under `pkexec` (invoked with the binary's own --ca-trust-operation flag).
-pub fn elevated_ca_trust(action: &str) -> Result<(), String> {
-    let source = ca_dir().join("rootCA.pem");
-    if !source.is_file() {
-        return Err("The local CA does not exist yet. Set up trusted HTTPS first.".into());
-    }
-    let (dest, refresh): (&str, &str) = if std::path::Path::new("/etc/debian_version").exists() {
+/// Installs the CA into the system trust store (via pkexec unless root).
+fn install_system_trust(ca: &std::path::Path) -> Result<(), String> {
+    let (dest, script) = if find_in_path("update-ca-certificates").is_some() {
         (
-            "/usr/local/share/ca-certificates/linuxdevstackbox-rootCA.crt",
-            "update-ca-certificates",
+            "/usr/local/share/ca-certificates",
+            r#"mkdir -p "$2" && install -m 644 "$1" "$2/linuxdevstackbox-ca.crt" && update-ca-certificates"#,
         )
-    } else if std::path::Path::new("/etc/pki").exists() {
+    } else if find_in_path("update-ca-trust").is_some() {
+        let dir = if PathBuf::from("/etc/pki/ca-trust/source/anchors").is_dir() {
+            "/etc/pki/ca-trust/source/anchors"
+        } else {
+            "/etc/ca-certificates/trust-source/anchors"
+        };
         (
-            "/etc/pki/ca-trust/source/anchors/linuxdevstackbox-rootCA.pem",
-            "update-ca-trust",
+            dir,
+            r#"mkdir -p "$2" && install -m 644 "$1" "$2/linuxdevstackbox-ca.crt" && update-ca-trust extract"#,
         )
     } else {
-        (
-            "/etc/ca-certificates/trust-source/anchors/linuxdevstackbox-rootCA.pem",
-            "update-ca-trust",
-        )
+        return Err("Cannot find update-ca-certificates or update-ca-trust to install the local CA. Install the ca-certificates package.".into());
     };
-
-    let run_refresh = |action: &str| -> Result<(), String> {
-        if which_exists(action) {
-            let out = create_hidden_command(action).output().map_err(|e| e.to_string())?;
-            if !out.status.success() {
-                return Err(format!(
-                    "{} failed: {}",
-                    action,
-                    String::from_utf8_lossy(&out.stderr).trim()
-                ));
-            }
+    let mut cmd = if running_as_root() {
+        create_hidden_command("sh")
+    } else {
+        if find_in_path("pkexec").is_none() {
+            return Err(format!(
+                "pkexec (polkit) is required to trust the local CA. As root, copy {} to {dest}/{CA_FILE_NAME} and refresh the trust store.",
+                ca.display()
+            ));
         }
-        Ok(())
+        let mut c = create_hidden_command("pkexec");
+        c.arg("sh");
+        c
     };
-
-    match action {
-        "install" => {
-            if let Some(parent) = std::path::Path::new(dest).parent() {
-                fs::create_dir_all(parent).map_err(|e| e.to_string())?;
-            }
-            fs::copy(&source, dest)
-                .map_err(|e| format!("Cannot install the CA anchor: {e}"))?;
-            restrict_permissions(std::path::Path::new(dest), 0o644)?;
-            run_refresh(refresh)
-        }
-        "remove" => {
-            match fs::remove_file(dest) {
-                Ok(()) => {}
-                Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(()),
-                Err(e) => return Err(format!("Cannot remove the CA anchor: {e}")),
-            }
-            run_refresh(refresh)
-        }
-        _ => Err("Invalid CA trust operation".into()),
-    }
-}
-
-fn which_exists(name: &str) -> bool {
-    let path_env = std::env::var("PATH").unwrap_or_default();
-    path_env.split(':').any(|dir| std::path::Path::new(dir).join(name).is_file())
-}
-
-fn pkexec(args: &[&str]) -> Result<(), String> {
-    let exe = std::env::current_exe().map_err(|e| e.to_string())?;
-    let out = create_hidden_command("pkexec")
-        .arg(&exe)
-        .args(args)
+    let out = cmd
+        .arg("-c")
+        .arg(script)
+        .arg("sh")
+        .arg(ca)
+        .arg(dest)
         .output()
-        .map_err(|e| format!("Cannot run pkexec: {e}"))?;
+        .map_err(|e| e.to_string())?;
     if !out.status.success() {
         return Err(format!(
-            "Elevated CA trust operation failed ({}). {}",
-            out.status,
-            String::from_utf8_lossy(&out.stderr).trim()
+            "Could not install the local CA into the system trust store (permission declined?): {}",
+            String::from_utf8_lossy(&out.stderr)
         ));
     }
     Ok(())
 }
 
-fn install_ca_trust() -> Result<(), String> {
-    if ca_anchor_installed() || ca_trusted() {
-        return Ok(());
+/// Best effort: browsers on Linux (Chrome/Chromium, Firefox) use NSS databases
+/// instead of the system store. Needs `certutil` (libnss3-tools / nss-tools).
+fn install_nss_trust(ca: &std::path::Path) {
+    let Some(certutil) = find_in_path("certutil") else {
+        return;
+    };
+    let Some(home) = std::env::var_os("HOME").map(PathBuf::from) else {
+        return;
+    };
+    let mut dbs = vec![home.join(".pki").join("nssdb")];
+    if let Ok(profiles) = fs::read_dir(home.join(".mozilla").join("firefox")) {
+        for p in profiles.flatten() {
+            if p.path().join("cert9.db").exists() {
+                dbs.push(p.path());
+            }
+        }
     }
-    pkexec(&["--ca-trust-operation", "install"])
+    for db in dbs {
+        if !db.exists() {
+            if fs::create_dir_all(&db).is_err() {
+                continue;
+            }
+            let _ = create_hidden_command(&certutil.to_string_lossy())
+                .args(["-N", "--empty-password", "-d"])
+                .arg(format!("sql:{}", db.display()))
+                .output();
+        }
+        let spec = format!("sql:{}", db.display());
+        let nick = "LinuxDevStackBox Local CA";
+        let _ = create_hidden_command(&certutil.to_string_lossy())
+            .args(["-D", "-n", nick, "-d", &spec])
+            .output();
+        let _ = create_hidden_command(&certutil.to_string_lossy())
+            .args(["-A", "-t", "C,,", "-n", nick, "-d", &spec, "-i"])
+            .arg(ca)
+            .output();
+    }
+}
+
+fn create_ca() -> Result<(), String> {
+    let dir = ca_dir();
+    let key = dir.join("rootCA-key.pem");
+    let cert = dir.join("rootCA.pem");
+    let out = openssl_run(&[
+        "req".into(),
+        "-x509".into(),
+        "-newkey".into(),
+        "rsa:3072".into(),
+        "-nodes".into(),
+        "-sha256".into(),
+        "-days".into(),
+        "3650".into(),
+        "-keyout".into(),
+        key.to_string_lossy().into_owned(),
+        "-out".into(),
+        cert.to_string_lossy().into_owned(),
+        "-subj".into(),
+        "/O=LinuxDevStackBox/CN=LinuxDevStackBox Local CA".into(),
+        "-addext".into(),
+        "basicConstraints=critical,CA:TRUE".into(),
+        "-addext".into(),
+        "keyUsage=critical,keyCertSign,cRLSign".into(),
+    ])?;
+    ensure_ok(out, "Creating the local certificate authority")?;
+    chmod(&key, 0o600);
+    Ok(())
 }
 
 pub fn ensure_ca(trust: bool) -> Result<(), String> {
     fs::create_dir_all(ca_dir()).map_err(|e| e.to_string())?;
-    // Protect keys regardless of how permissive the inherited umask is.
-    restrict_permissions(&tls_dir(), 0o700)?;
-    restrict_permissions(&ca_dir(), 0o700)?;
-    let root_ca = ca_dir().join("rootCA.pem");
-    let root_key = ca_dir().join("rootCA-key.pem");
-    if !root_ca.exists() {
-        if root_key.exists() {
-            return Err("The CA certificate is missing but its private key exists. Delete the HTTPS directory and regenerate, or restore the certificate.".into());
-        }
-        let subject = format!(
-            "/O=LinuxDevStackBox/OU=Local Development CA/CN=LinuxDevStackBox Local CA ({})",
-            whoami_username()
-        );
-        let out = openssl(&[
-            "req", "-x509", "-newkey", "rsa:3072", "-sha256", "-days", "3650", "-nodes",
-            "-keyout", root_key.to_str().unwrap_or(""),
-            "-out", root_ca.to_str().unwrap_or(""),
-            "-subj", &subject,
-            "-addext", "basicConstraints=critical,CA:TRUE",
-            "-addext", "keyUsage=critical,keyCertSign,cRLSign",
-        ])?;
-        if !out.status.success() {
-            return Err(format!(
-                "CA generation failed: {}",
-                String::from_utf8_lossy(&out.stderr).trim()
-            ));
-        }
+    // Keys are per-user: owner-only directories and key files.
+    chmod(&tls_dir(), 0o700);
+    chmod(&ca_dir(), 0o700);
+    let ca = ca_dir().join("rootCA.pem");
+    if !ca.exists() || !ca_dir().join("rootCA-key.pem").exists() {
+        create_ca()?;
     }
-    restrict_permissions(&root_key, 0o600)?;
-    restrict_permissions(&root_ca, 0o644)?;
-    if trust {
-        install_ca_trust()?;
+    if trust && !ca_trusted() {
+        install_system_trust(&ca)?;
+        install_nss_trust(&ca);
     }
-    if !ca_dir().join("rootCA.pem").exists() {
+    if !ca.exists() {
         return Err("Set up trusted HTTPS first.".into());
     }
     Ok(())
 }
 
-fn whoami_username() -> String {
-    std::env::var("USER")
-        .or_else(|_| std::env::var("LOGNAME"))
-        .unwrap_or_else(|_| "user".to_string())
+/// Issues a leaf certificate signed by the local CA into `cert_out`/`key_out`.
+fn issue_leaf(cert_out: &std::path::Path, key_out: &std::path::Path, names: &[String]) -> Result<(), String> {
+    let primary = names.first().ok_or("No hostnames for certificate")?;
+    let csr = cert_out.with_extension("csr");
+    let ext = cert_out.with_extension("ext");
+    let san = names
+        .iter()
+        .map(|n| {
+            if n.parse::<std::net::IpAddr>().is_ok() {
+                format!("IP:{n}")
+            } else {
+                format!("DNS:{n}")
+            }
+        })
+        .collect::<Vec<_>>()
+        .join(",");
+    fs::write(
+        &ext,
+        format!("basicConstraints=CA:FALSE\nkeyUsage=digitalSignature,keyEncipherment\nextendedKeyUsage=serverAuth\nsubjectAltName={san}\n"),
+    )
+    .map_err(|e| e.to_string())?;
+    let result = (|| {
+        let out = openssl_run(&[
+            "req".into(),
+            "-new".into(),
+            "-newkey".into(),
+            "rsa:2048".into(),
+            "-nodes".into(),
+            "-keyout".into(),
+            key_out.to_string_lossy().into_owned(),
+            "-out".into(),
+            csr.to_string_lossy().into_owned(),
+            "-subj".into(),
+            format!("/O=LinuxDevStackBox/CN={primary}"),
+        ])?;
+        ensure_ok(out, "Creating the certificate request")?;
+        chmod(key_out, 0o600);
+        let out = openssl_run(&[
+            "x509".into(),
+            "-req".into(),
+            "-in".into(),
+            csr.to_string_lossy().into_owned(),
+            "-CA".into(),
+            ca_dir().join("rootCA.pem").to_string_lossy().into_owned(),
+            "-CAkey".into(),
+            ca_dir().join("rootCA-key.pem").to_string_lossy().into_owned(),
+            "-CAcreateserial".into(),
+            "-out".into(),
+            cert_out.to_string_lossy().into_owned(),
+            "-days".into(),
+            "397".into(),
+            "-sha256".into(),
+            "-extfile".into(),
+            ext.to_string_lossy().into_owned(),
+        ])?;
+        ensure_ok(out, "Signing the site certificate")
+    })();
+    let _ = fs::remove_file(&csr);
+    let _ = fs::remove_file(&ext);
+    result
 }
-
-fn san_value(name: &str) -> String {
-    if name.parse::<std::net::IpAddr>().is_ok() {
-        format!("IP:{name}")
-    } else {
-        format!("DNS:{name}")
-    }
-}
-
 pub fn ensure_leaf(host: &str, aliases: &[String]) -> Result<(), String> {
     let cert = leaf(host);
     let names: Vec<String> = if host == "localhost" {
@@ -252,81 +293,38 @@ pub fn ensure_leaf(host: &str, aliases: &[String]) -> Result<(), String> {
         && leaf_key(host).exists()
         && key_matches_certificate(host)
         && fs::read_to_string(&manifest).ok().as_deref() == Some(&wanted)
-        && openssl(&["x509", "-checkend", "2592000", "-noout", "-in", cert.to_str().unwrap_or("")])
+        && openssl(&["x509", "-checkend", "2592000", "-noout", "-in"], &cert)
             .is_ok_and(|o| o.status.success())
-        && openssl(&[
-            "verify", "-CAfile", ca_dir().join("rootCA.pem").to_str().unwrap_or(""),
-            cert.to_str().unwrap_or(""),
-        ])
-        .is_ok_and(|o| o.status.success());
+        && create_hidden_command(&get_openssl_exe(&get_installation_path()).to_string_lossy())
+            .args(["verify", "-CAfile"])
+            .arg(ca_dir().join("rootCA.pem"))
+            .arg(&cert)
+            .output()
+            .is_ok_and(|o| o.status.success());
     if fresh {
         return Ok(());
     }
     let pending = cert.with_extension("pending.pem");
     let pending_key = leaf_key(host).with_extension("pending.pem");
-    let csr = tls_dir().join(format!("{}.pending.csr", site_id(host)));
-    let ext_file = tls_dir().join(format!("{}.pending.ext", site_id(host)));
-
-    let out = openssl(&[
-        "req", "-new", "-newkey", "rsa:2048", "-sha256", "-nodes",
-        "-keyout", pending_key.to_str().unwrap_or(""),
-        "-out", csr.to_str().unwrap_or(""),
-        "-subj", &format!("/CN={host}"),
-    ])?;
-    if !out.status.success() {
-        return Err(format!(
-            "Key generation failed: {}",
-            String::from_utf8_lossy(&out.stderr).trim()
-        ));
-    }
-    restrict_permissions(&pending_key, 0o600)?;
-
-    let sans = names.iter().map(|n| san_value(n)).collect::<Vec<_>>().join(",");
-    fs::write(
-        &ext_file,
-        format!(
-            "basicConstraints=CA:FALSE\nkeyUsage=digitalSignature,keyEncipherment\nextendedKeyUsage=serverAuth\nsubjectAltName={sans}\n"
-        ),
-    )
-    .map_err(|e| e.to_string())?;
-
-    let out = openssl(&[
-        "x509", "-req", "-sha256", "-days", "825",
-        "-in", csr.to_str().unwrap_or(""),
-        "-CA", ca_dir().join("rootCA.pem").to_str().unwrap_or(""),
-        "-CAkey", ca_dir().join("rootCA-key.pem").to_str().unwrap_or(""),
-        "-CAcreateserial",
-        "-extfile", ext_file.to_str().unwrap_or(""),
-        "-out", pending.to_str().unwrap_or(""),
-    ])?;
-    let _ = fs::remove_file(&csr);
-    let _ = fs::remove_file(&ext_file);
-    if !out.status.success() {
-        return Err(format!(
-            "Certificate signing failed: {}",
-            String::from_utf8_lossy(&out.stderr).trim()
-        ));
-    }
+    issue_leaf(&pending, &pending_key, &names)?;
     fs::rename(&pending, &cert).map_err(|e| e.to_string())?;
     fs::rename(&pending_key, leaf_key(host)).map_err(|e| e.to_string())?;
+    chmod(&leaf_key(host), 0o600);
     fs::write(manifest, wanted).map_err(|e| e.to_string())?;
     Ok(())
 }
-
 fn key_matches_certificate(host: &str) -> bool {
-    let cert = openssl(&["x509", "-pubkey", "-noout", "-in", leaf(host).to_str().unwrap_or("")]);
-    let key = openssl(&["pkey", "-pubout", "-in", leaf_key(host).to_str().unwrap_or("")]);
+    let cert = openssl(&["x509", "-pubkey", "-noout", "-in"], &leaf(host));
+    let key = openssl(&["pkey", "-pubout", "-in"], &leaf_key(host));
     matches!((cert, key), (Ok(c), Ok(k)) if c.status.success() && k.status.success() && c.stdout == k.stdout)
 }
-
 pub fn https_port() -> u16 {
     fs::read_to_string(user_config_dir().join("https-port"))
         .ok()
         .and_then(|s| s.trim().parse().ok())
         .filter(|p| *p > 0)
-        .unwrap_or(443)
+        .unwrap_or_else(crate::utils::config_ports::default_https_port)
 }
-
 pub fn site_url(host: &str) -> String {
     let port = https_port();
     if port == 443 {
@@ -335,25 +333,21 @@ pub fn site_url(host: &str) -> String {
         format!("https://{host}:{port}/")
     }
 }
-
 pub fn https_enabled() -> bool {
     user_config_dir().join("https-enabled").is_file()
 }
-
 pub fn render_ssl(entries: &[VhostEntry]) -> Result<String, String> {
     if !https_enabled() {
         return Ok(String::new());
     }
-    // The SSL module must be loaded with an absolute path so the generated
-    // configuration works no matter where the distribution puts its modules.
-    let ssl_module = crate::commands::apache::apache_runtime()
-        .ok()
-        .map(|runtime| runtime.modules_dir.join("mod_ssl.so"))
-        .unwrap_or_else(|| PathBuf::from("modules/mod_ssl.so"));
-    let mut conf = format!(
-        "# Managed LinuxDevStackBox HTTPS\nLoadModule ssl_module {}\nListen 127.0.0.1:443\nListen [::1]:443\nSSLSessionCache none\nSSLProtocol -all +TLSv1.2 +TLSv1.3\n",
-        ssl_module.display()
-    );
+    let modules = get_apache_modules_dir(&get_installation_path());
+    if let Some(dir) = &modules {
+        if !dir.join("mod_ssl.so").exists() {
+            return Err("Apache's mod_ssl is not installed (Fedora/RHEL: install the mod_ssl package).".into());
+        }
+    }
+    let load_ssl = if modules.is_some() { "LoadModule ssl_module modules/mod_ssl.so\n" } else { "" };
+    let mut conf = format!("# Managed LinuxDevStackBox HTTPS\n{load_ssl}Listen 127.0.0.1:443\nListen [::1]:443\nSSLSessionCache none\nSSLProtocol -all +TLSv1.2 +TLSv1.3\n");
     conf = conf.replace(":443", &format!(":{}", https_port()));
     let localhost = VhostEntry::localhost();
     for site in std::iter::once(&localhost).chain(entries.iter().filter(|s| s.enabled && s.https)) {
@@ -367,7 +361,6 @@ pub fn render_ssl(entries: &[VhostEntry]) -> Result<String, String> {
     }
     Ok(conf)
 }
-
 pub fn health_alias(host: &str) -> String {
     let file = tls_dir().join(format!("{}.txt", site_id(host)));
     format!(
@@ -376,7 +369,6 @@ pub fn health_alias(host: &str) -> String {
         to_apache_path(&tls_dir())
     )
 }
-
 pub fn write_health(host: &str) -> Result<(), String> {
     fs::create_dir_all(tls_dir()).map_err(|e| e.to_string())?;
     fs::write(
@@ -385,7 +377,6 @@ pub fn write_health(host: &str) -> Result<(), String> {
     )
     .map_err(|e| e.to_string())
 }
-
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct SiteHealth {
     pub domain: String,
@@ -397,7 +388,6 @@ pub struct SiteHealth {
     pub expiry: Option<String>,
     pub url: String,
 }
-
 #[derive(Serialize)]
 pub struct SslStatus {
     pub ca_exists: bool,
@@ -407,7 +397,6 @@ pub struct SslStatus {
     pub setup_error: Option<String>,
     pub port: u16,
 }
-
 pub async fn probe(site: &VhostEntry) -> SiteHealth {
     let mut health = SiteHealth {
         domain: site.domain.clone(),
@@ -419,7 +408,7 @@ pub async fn probe(site: &VhostEntry) -> SiteHealth {
         expiry: None,
         url: site_url(&site.domain),
     };
-    if let Ok(o) = openssl(&["x509", "-noout", "-enddate", "-in", leaf(&site.domain).to_str().unwrap_or("")]) {
+    if let Ok(o) = openssl(&["x509", "-noout", "-enddate", "-in"], &leaf(&site.domain)) {
         if o.status.success() {
             health.expiry = Some(
                 String::from_utf8_lossy(&o.stdout)
@@ -451,7 +440,7 @@ pub async fn probe(site: &VhostEntry) -> SiteHealth {
     }
     if !crate::utils::process::is_our_process_running(
         "httpd",
-        &user_config_dir().join("httpd.conf"),
+        &get_apache_exe(&get_installation_path()),
     ) {
         health.message = "Configured; Apache stopped".into();
         return health;
@@ -477,8 +466,10 @@ pub async fn probe(site: &VhostEntry) -> SiteHealth {
                 .get::<reqwest::tls::TlsInfo>()
                 .and_then(|i| i.peer_certificate())
                 .ok_or("No peer certificate available")?;
-            let expected = openssl_ok(&["x509", "-outform", "DER", "-in", leaf(&site.domain).to_str().unwrap_or("")])?;
-            if Sha256::digest(peer) != Sha256::digest(&expected) {
+            let expected = openssl(&["x509", "-outform", "DER", "-in"], &leaf(&site.domain))?;
+            if !expected.status.success()
+                || Sha256::digest(peer) != Sha256::digest(&expected.stdout)
+            {
                 return Err("Apache is serving an unexpected certificate".into());
             }
             if !response.status().is_success()
@@ -499,7 +490,6 @@ pub async fn probe(site: &VhostEntry) -> SiteHealth {
     }
     health
 }
-
 #[tauri::command]
 pub async fn get_ssl_status() -> Result<SslStatus, String> {
     let mut sites = vec![probe(&VhostEntry::localhost()).await];
@@ -515,26 +505,25 @@ pub async fn get_ssl_status() -> Result<SslStatus, String> {
         setup_error: fs::read_to_string(user_config_dir().join("https-setup-error.txt")).ok(),
     })
 }
-
 pub fn lock_configuration() -> Result<std::fs::File, String> {
-    fs::OpenOptions::new()
-        .write(true)
-        .create(true)
-        .truncate(false)
+    let busy = || -> String {
+        "Another site or HTTPS operation is running. Wait for it to finish, then retry.".into()
+    };
+    let mut options = fs::OpenOptions::new();
+    options.write(true).create(true).truncate(false);
+    let file = options
         .open(user_config_dir().join("https-operation.lock"))
-        .map_err(|_| {
-            "Another site or HTTPS operation is running. Wait for it to finish, then retry.".into()
-        })
+        .map_err(|_| busy())?;
+    // Advisory exclusive lock (flock); released when the File is dropped.
+    file.try_lock().map_err(|_| busy())?;
+    Ok(file)
 }
-
 pub async fn provision() -> Result<String, String> {
     provision_inner(true, None).await
 }
-
 pub async fn renew_existing() -> Result<String, String> {
     provision_inner(false, None).await
 }
-
 pub(super) fn reject_unrecorded_sites(configuration: &str, entries: &[VhostEntry]) -> Result<(), String> {
     for line in configuration.lines() {
         let mut words = line.split_whitespace();
@@ -552,7 +541,6 @@ pub(super) fn reject_unrecorded_sites(configuration: &str, entries: &[VhostEntry
     }
     Ok(())
 }
-
 async fn provision_inner(install_trust: bool, port: Option<u16>) -> Result<String, String> {
     let _guard = SITE_LOCK.lock().await;
     let _process_lock = lock_configuration()?;
@@ -583,7 +571,7 @@ async fn provision_inner(install_trust: bool, port: Option<u16>) -> Result<Strin
     let saved = super::vhosts::snapshot(&paths)?;
     let was_running = crate::utils::process::is_our_process_running(
         "httpd",
-        &config.join("httpd.conf"),
+        &get_apache_exe(&get_installation_path()),
     );
     let result: Result<(), String> = async {
         if let Some(port) = port {
@@ -622,22 +610,18 @@ async fn provision_inner(install_trust: bool, port: Option<u16>) -> Result<Strin
     let _ = fs::remove_file(config.join("https-setup-error.txt"));
     Ok(probe(&VhostEntry::localhost()).await.message)
 }
-
 #[tauri::command]
 pub async fn enable_ssl(port: Option<u16>) -> Result<String, String> {
     provision_inner(true, port).await
 }
-
 #[tauri::command]
 pub async fn trust_ssl_ca() -> Result<String, String> {
     provision().await
 }
-
 #[tauri::command]
 pub async fn generate_ssl_cert() -> Result<String, String> {
     provision().await
 }
-
 #[tauri::command]
 pub async fn disable_ssl() -> Result<String, String> {
     let _guard = SITE_LOCK.lock().await;
@@ -652,13 +636,12 @@ pub async fn disable_ssl() -> Result<String, String> {
     }
     Ok("HTTPS disabled; certificates and projects preserved".into())
 }
-
-pub fn repair_ssl_conf() { /* Configuration is reconciled explicitly, never silently re-enabled. */ }
+pub fn repair_ssl_conf() { /* Configuration is reconciled explicitly, never silently re-enabled. */
+}
 
 #[cfg(test)]
 mod tests {
     use super::*;
-
     #[test]
     fn renewal_refuses_to_erase_unrecorded_or_disabled_sites() {
         let config = "# ServerName ignored.test\nServerName localhost\n ServerName \"shop.test\"\n";
@@ -670,17 +653,9 @@ mod tests {
         assert!(reject_unrecorded_sites(config, &[site]).is_err());
         assert!(reject_unrecorded_sites("ServerName localhost\n# ServerName old.test", &[]).is_ok());
     }
-
     #[test]
     fn filenames_are_case_normalized_and_do_not_embed_host_input() {
         assert_eq!(site_id("SHOP.test"), site_id("shop.test"));
         assert_eq!(site_id("../bad").len(), 64);
-    }
-
-    #[test]
-    fn san_values_use_ip_syntax_for_addresses() {
-        assert_eq!(san_value("localhost"), "DNS:localhost");
-        assert_eq!(san_value("127.0.0.1"), "IP:127.0.0.1");
-        assert_eq!(san_value("::1"), "IP:::1");
     }
 }

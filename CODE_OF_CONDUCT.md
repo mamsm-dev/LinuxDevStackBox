@@ -1,6 +1,6 @@
 # Code of Conduct
 
-LinuxDevStackBox is an open-source project. This document explains the expectations for everyone participating in the community, including issues, pull requests, discussions, and other project spaces.
+DevStackBox is an open-source project. This document explains the expectations for everyone participating in the community, including issues, pull requests, discussions, and other project spaces.
 
 ## Be decent
 
@@ -18,13 +18,13 @@ This applies to:
 
 - GitHub issues, PRs, and discussions
 - Comments on commits and reviews
-- Project docs and community spaces tied to LinuxDevStackBox
+- Project docs and community spaces tied to DevStackBox
 
-It also applies when you are representing the project elsewhere (for example, answering questions about LinuxDevStackBox).
+It also applies when you are representing the project elsewhere (for example, answering questions about DevStackBox).
 
 ## Reporting a problem
 
-If someone is being abusive or making the project a bad place to contribute, open a private contact via [GitHub Security Advisories](https://github.com/mamsm-dev/LinuxDevStackBox/security/advisories/new) with:
+If someone is being abusive or making the project a bad place to contribute, email **hello@devstackbox.com** with:
 
 - What happened
 - Where it happened (link if you have one)
@@ -45,4 +45,4 @@ For one-off mistakes, a warning is usually enough. Repeated or severe behavior g
 
 ## Attribution
 
-This Code of Conduct was inspired by the [Contributor Covenant](https://www.contributor-covenant.org/) and adapted to fit the needs of the LinuxDevStackBox community.
+This Code of Conduct was inspired by the [Contributor Covenant](https://www.contributor-covenant.org/) and adapted to fit the needs of the DevStackBox community.

@@ -129,7 +129,7 @@ pub fn apply_recommended_import_limits(content: &str, upload_tmp_dir: Option<&st
     c
 }
 
-/// Migrate only when still on legacy defaults and not yet at import limits v1.
+/// Migrate only when still on legacy LinuxDevStackBox defaults and not yet at import limits v1.
 pub fn maybe_migrate_php_import_limits(content: &str, upload_tmp_dir: &str) -> Option<String> {
     if parse_php_import_limits_version(content).unwrap_or(0) >= PHP_IMPORT_LIMITS_VERSION {
         return None;
@@ -149,10 +149,10 @@ mod tests {
 
     #[test]
     fn automatic_migration_keeps_custom_upload_directory() {
-        let content = "upload_tmp_dir=\"D:/custom uploads\"\n";
-        let updated = maybe_migrate_php_import_limits(content, "C:/managed/tmp").unwrap();
-        assert!(updated.contains("upload_tmp_dir=\"D:/custom uploads\""));
-        assert!(!updated.contains("C:/managed/tmp"));
+        let content = "upload_tmp_dir=\"/srv/custom uploads\"\n";
+        let updated = maybe_migrate_php_import_limits(content, "/managed/tmp").unwrap();
+        assert!(updated.contains("upload_tmp_dir=\"/srv/custom uploads\""));
+        assert!(!updated.contains("/managed/tmp"));
     }
 
     #[test]

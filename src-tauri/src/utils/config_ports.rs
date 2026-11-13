@@ -1,6 +1,16 @@
 // Parse Apache Listen and MySQL port from user config files.
 
-use crate::utils::paths::user_config_dir;
+use crate::utils::paths::{can_bind_privileged_ports, user_config_dir};
+
+/// Default HTTP port: 80 when the user may bind it, otherwise 8080.
+pub fn default_http_port() -> u16 {
+    if can_bind_privileged_ports() { 80 } else { 8080 }
+}
+
+/// Default HTTPS port: 443 when the user may bind it, otherwise 8443.
+pub fn default_https_port() -> u16 {
+    if can_bind_privileged_ports() { 443 } else { 8443 }
+}
 
 fn parse_listen_port(content: &str) -> Option<u16> {
     for line in content.lines() {
@@ -47,8 +57,7 @@ pub fn apache_listen_port() -> u16 {
     std::fs::read_to_string(&path)
         .ok()
         .and_then(|c| parse_listen_port(&c))
-        // Services run unprivileged on Linux, so the default stays above 1024.
-        .unwrap_or(8080)
+        .unwrap_or_else(default_http_port)
 }
 
 pub fn mysql_port() -> u16 {

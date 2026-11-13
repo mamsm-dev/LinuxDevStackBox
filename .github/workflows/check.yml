@@ -1,0 +1,37 @@
+name: Linux verification
+on: [push, pull_request]
+jobs:
+  check:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+      - run: sudo bash scripts/install-deps.sh build
+      - run: npm ci
+      - run: npm run check:ci
+      - run: npm run build
+      - run: cargo test --manifest-path src-tauri/Cargo.toml --lib
+      - run: cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets
+  appimage:
+    runs-on: ubuntu-22.04
+    needs: check
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - uses: dtolnay/rust-toolchain@stable
+      - run: sudo bash scripts/install-deps.sh build
+      - run: npm ci
+      - run: npm run build:release
+      - uses: actions/upload-artifact@v4
+        with:
+          name: LinuxDevStackBox-AppImage
+          path: src-tauri/target/release/bundle/appimage/*.AppImage

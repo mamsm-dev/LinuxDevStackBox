@@ -172,7 +172,7 @@ export function ServiceStatusProvider({ children }: { children: ReactNode }) {
   // Track previous running state to detect unexpected crashes
   // Only live observations can establish a crash baseline; cache is presentation only.
   const prevRunningRef = useRef<Partial<Record<string, boolean>>>({});
-  // A stop command can return before the kernel has fully reaped every child.
+  // A stop command can return before the OS has fully reaped every child.
   // Remember the expected stop until a live poll observes it so a delayed
   // process exit cannot be misreported as a crash after the loading UI ends.
   const expectedStopsRef = useRef(new Set<string>());
@@ -518,7 +518,7 @@ export function ServiceStatusProvider({ children }: { children: ReactNode }) {
     let disposed = false;
     (async () => {
       unlisten = await listen("window-hidden-to-tray", () => {
-        const SHOWN_KEY = "linuxdevstackbox.tray.hideNoticeShown";
+        const SHOWN_KEY = "devstackbox.tray.hideNoticeShown";
         if (!localStorage.getItem(SHOWN_KEY)) {
           localStorage.setItem(SHOWN_KEY, "1");
           void notify(

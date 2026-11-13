@@ -1,126 +1,80 @@
-// Process and executable utilities (Linux).
-//
-// All service discovery reads /proc directly: the exe symlink gives the
-// binary path and cmdline gives the arguments. A service is considered "ours"
-// only when its executable basename matches AND its command line references
-// our generated configuration file, so system Apache/MySQL instances (started
-// by systemd, XAMPP in /opt/lampp, Docker, ...) are never touched.
+// Process and executable utilities (Linux, /proc based).
 
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::process::Command;
+use std::time::{Duration, Instant};
 
-pub fn create_hidden_command(program: impl AsRef<std::ffi::OsStr>) -> Command {
+/// ELF 32-bit check is irrelevant on Linux; kept so callers compile.
+pub fn is_32bit_executable(_path: &Path) -> Result<bool, String> {
+    Ok(false)
+}
+
+/// Creates a plain `Command`. (The name is a leftover from the Windows port,
+/// where it suppressed console windows.)
+pub fn create_hidden_command(program: &str) -> Command {
     Command::new(program)
 }
 
-/// Creates a service command that runs in its own process group so stop/kill
-/// can address the whole tree (Apache workers, InnoDB helpers) without
-/// touching unrelated processes.
-pub fn create_service_command(program: impl AsRef<std::ffi::OsStr>) -> Command {
-    use std::os::unix::process::CommandExt;
-    let mut cmd = Command::new(program);
-    cmd.process_group(0);
-    cmd
-}
-
-fn kill_signal(pid: u32, signal: i32, negative: bool) -> bool {
-    let target = if negative { -(pid as i32) } else { pid as i32 };
-    unsafe { libc::kill(target, signal) == 0 }
-}
-
-/// Kill a process tree: SIGTERM to the process group, then SIGKILL.
-pub fn kill_pid(pid: u32) -> Result<(), String> {
-    // -pid targets the process group created by create_service_command; when
-    // the process is not a group leader, fall back to the single PID.
-    if kill_signal(pid, libc::SIGTERM, true) || kill_signal(pid, libc::SIGTERM, false) {
-        std::thread::sleep(std::time::Duration::from_millis(300));
-    }
-    if kill_signal(pid, libc::SIGKILL, true) || kill_signal(pid, libc::SIGKILL, false) {
-        return Ok(());
-    }
-    let errno = std::io::Error::last_os_error();
-    if errno.kind() == std::io::ErrorKind::NotFound {
-        return Ok(());
-    }
-    Err(format!("kill failed for pid {pid}: {errno}"))
-}
-
-// =====================================================================
-// /proc scanning
-// =====================================================================
-
 struct ProcEntry {
     pid: u32,
+    /// Resolved path of the executable (`/proc/<pid>/exe`).
     exe: PathBuf,
-    cmdline: String,
+    /// argv, split on NUL.
+    args: Vec<String>,
 }
 
-/// Read /proc and return every accessible process with its exe path and
-/// command line. Processes of other users (and short-lived kernel threads)
-/// are simply skipped.
-fn scan_processes() -> Vec<ProcEntry> {
-    let mut entries = Vec::new();
-    let Ok(dir) = std::fs::read_dir("/proc") else {
-        return entries;
-    };
+fn read_proc_entries() -> Vec<ProcEntry> {
+    let mut out = Vec::new();
+    let Ok(dir) = std::fs::read_dir("/proc") else { return out };
     for entry in dir.flatten() {
-        let file_name = entry.file_name();
-        let Some(name) = file_name.to_str() else { continue };
-        let Ok(pid) = name.parse::<u32>() else { continue };
-        let proc_dir = entry.path();
-        let exe = std::fs::read_link(proc_dir.join("exe")).unwrap_or_default();
-        let cmdline = std::fs::read_to_string(proc_dir.join("cmdline"))
-            .map(|raw| raw.split('\0').filter(|s| !s.is_empty()).collect::<Vec<_>>().join(" "))
-            .unwrap_or_default();
-        if exe.as_os_str().is_empty() && cmdline.is_empty() {
-            continue;
+        let name = entry.file_name();
+        let Some(pid) = name.to_str().and_then(|s| s.parse::<u32>().ok()) else { continue };
+        let base = entry.path();
+        // readlink fails for kernel threads and processes we may not inspect.
+        let Ok(mut exe) = std::fs::read_link(base.join("exe")) else { continue };
+        // A replaced binary shows up as "<path> (deleted)".
+        if let Some(s) = exe.to_str() {
+            if let Some(stripped) = s.strip_suffix(" (deleted)") {
+                exe = PathBuf::from(stripped);
+            }
         }
-        entries.push(ProcEntry { pid, exe, cmdline });
+        let args = std::fs::read(base.join("cmdline"))
+            .map(|raw| {
+                raw.split(|b| *b == 0)
+                    .filter(|p| !p.is_empty())
+                    .map(|p| String::from_utf8_lossy(p).into_owned())
+                    .collect()
+            })
+            .unwrap_or_default();
+        out.push(ProcEntry { pid, exe, args });
     }
-    entries
+    out
 }
 
-fn image_name(entry: &ProcEntry) -> String {
-    entry
-        .exe
-        .file_name()
-        .and_then(|n| n.to_str())
-        .map(|n| n.to_lowercase())
-        .unwrap_or_default()
+fn exe_basename(p: &Path) -> String {
+    p.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default()
 }
 
-fn is_diagnostic_process(image: &str, command_line: &str) -> bool {
-    let tokens: Vec<&str> = command_line.split_whitespace().collect();
-    tokens.iter().skip(1).any(|arg| match image {
-        "httpd" | "apache2" => matches!(*arg, "-v" | "-V" | "-t" | "-S" | "-M" | "-l" | "-L" | "-h" | "-?"),
-        "mysqld" | "mariadbd" => matches!(*arg, "--version" | "-V" | "--help" | "-?" | "--validate-config" | "--initialize" | "--initialize-insecure"),
-        _ => false,
-    })
-}
-
-fn sanitize_image_name(process_name: &str) -> bool {
-    !process_name.is_empty()
-        && process_name
-            .chars()
-            .all(|c| c.is_ascii_alphanumeric() || c == '.' || c == '_' || c == '-')
-}
-
-// Returns PIDs grouped by process image name (lowercase), one /proc scan.
+/// Returns running processes whose executable file name equals one of
+/// `process_names` (e.g. "apache2", "httpd", "mysqld", "mariadbd"), as
+/// `(pid, executable path)` grouped by the requested name. Diagnostic probes
+/// such as `httpd -t` or `mysqld --version` are ignored.
 pub fn batch_find_processes_by_image(process_names: &[&str]) -> HashMap<String, Vec<(u32, PathBuf)>> {
     let mut map: HashMap<String, Vec<(u32, PathBuf)>> = HashMap::new();
     for name in process_names {
-        map.insert(name.to_lowercase(), Vec::new());
+        map.insert(name.to_string(), Vec::new());
     }
-    if process_names.is_empty() || process_names.iter().any(|n| !sanitize_image_name(n)) {
+    if process_names.is_empty() {
         return map;
     }
-    for entry in scan_processes() {
-        let image = image_name(&entry);
-        if let Some(bucket) = map.get_mut(&image) {
-            if !is_diagnostic_process(&image, &entry.cmdline) {
-                bucket.push((entry.pid, entry.exe));
+    for p in read_proc_entries() {
+        let base = exe_basename(&p.exe);
+        if let Some(key) = process_names.iter().find(|n| **n == base) {
+            if is_diagnostic_process(&base, &p.args) {
+                continue;
             }
+            map.entry(key.to_string()).or_default().push((p.pid, p.exe.clone()));
         }
     }
     map
@@ -128,51 +82,123 @@ pub fn batch_find_processes_by_image(process_names: &[&str]) -> HashMap<String, 
 
 pub fn find_processes_by_image(process_name: &str) -> Vec<(u32, PathBuf)> {
     batch_find_processes_by_image(&[process_name])
-        .remove(&process_name.to_lowercase())
+        .remove(process_name)
         .unwrap_or_default()
 }
 
+/// True if any process with this executable name runs (not path-aware; prefer
+/// `is_our_process_running`).
 pub fn is_process_running(process_name: &str) -> bool {
     !find_processes_by_image(process_name).is_empty()
 }
 
 pub fn get_process_pid(process_name: &str) -> Option<u32> {
-    find_processes_by_image(process_name).into_iter().map(|(pid, _)| pid).next()
+    find_processes_by_image(process_name).first().map(|(pid, _)| *pid)
 }
 
-/// Returns true only when a process with the given image name references
-/// `marker` (our generated config path) on its command line. This is the
-/// canonical "is OUR service running?" check.
-pub fn is_our_process_running(process_name: &str, marker: &Path) -> bool {
-    !find_our_processes(process_name, marker).is_empty()
+// Returns true only for processes whose executable equals the path we expect.
+// This is the canonical "is OUR service running?" check: a system-wide Apache
+// or MySQL (systemd) must never be mistaken for ours, nor be killed by us.
+pub fn is_our_process_running(process_name: &str, expected_path: &Path) -> bool {
+    !find_our_processes(process_name, expected_path).is_empty()
 }
 
-/// Returns the PIDs of `process_name` processes whose command line references
-/// `marker`. Pass the service's generated config file (httpd.conf / my.cnf)
-/// rather than the binary path, because the binary is shared with the system.
-pub fn find_our_processes(process_name: &str, marker: &Path) -> Vec<u32> {
-    if !sanitize_image_name(process_name) {
-        return Vec::new();
+// Returns the PIDs of processes whose executable path matches `expected_path`.
+// `process_name` is accepted for API symmetry; the match is path based.
+pub fn find_our_processes(_process_name: &str, expected_path: &Path) -> Vec<u32> {
+    let expected = normalize_path(expected_path);
+    read_proc_entries()
+        .into_iter()
+        .filter(|p| normalize_path(&p.exe) == expected)
+        .filter(|p| !is_diagnostic_process(&exe_basename(&p.exe), &p.args))
+        .map(|p| p.pid)
+        .collect()
+}
+
+// Version/configuration probes use the same executable as the server, but
+// their normal exit must never establish a running-service/crash baseline.
+fn is_diagnostic_process(image: &str, args: &[String]) -> bool {
+    let is_apache = image == "httpd" || image == "apache2";
+    let is_mysql = image == "mysqld" || image == "mariadbd";
+    args.iter().skip(1).any(|arg| {
+        if is_apache {
+            matches!(arg.as_str(), "-v" | "-V" | "-t" | "-S" | "-M" | "-l" | "-L" | "-h" | "-?")
+        } else if is_mysql {
+            matches!(
+                arg.as_str(),
+                "--version" | "-V" | "--help" | "-?" | "--validate-config" | "--initialize"
+                    | "--initialize-insecure" | "--verbose"
+            )
+        } else {
+            false
+        }
+    })
+}
+
+fn normalize_path(p: &Path) -> String {
+    // Canonicalize so symlinks (alternatives, /usr/sbin -> /sbin) collapse.
+    std::fs::canonicalize(p)
+        .map(|c| c.to_string_lossy().into_owned())
+        .unwrap_or_else(|_| p.to_string_lossy().into_owned())
+}
+
+fn pid_alive(pid: u32) -> bool {
+    // Zombies keep /proc/<pid> but have no exe; treat state Z as dead.
+    match std::fs::read_to_string(format!("/proc/{pid}/stat")) {
+        Ok(stat) => stat
+            .rsplit(')')
+            .next()
+            .map(|rest| !rest.trim_start().starts_with('Z'))
+            .unwrap_or(false),
+        Err(_) => false,
     }
-    let marker = marker.to_string_lossy().into_owned();
-    let mut pids = Vec::new();
-    for entry in scan_processes() {
-        if image_name(&entry) != process_name.to_lowercase() {
-            continue;
-        }
-        if !entry.cmdline.contains(&marker) {
-            continue;
-        }
-        if is_diagnostic_process(&process_name.to_lowercase(), &entry.cmdline) {
-            continue;
-        }
-        pids.push(entry.pid);
-    }
-    pids
 }
 
+fn send_signal(pid: u32, signal: &str) -> Result<(), String> {
+    let output = Command::new("kill")
+        .args([signal, &pid.to_string()])
+        .output()
+        .map_err(|e| format!("Failed to execute kill: {e}"))?;
+    if output.status.success() {
+        Ok(())
+    } else {
+        Err(format!(
+            "kill {signal} failed for pid {pid}: {}",
+            String::from_utf8_lossy(&output.stderr)
+        ))
+    }
+}
+
+// Stops a single PID: SIGTERM first (lets Apache/MySQL shut down cleanly and
+// flush), then SIGKILL if it is still alive after a short grace period.
+// Used instead of killing by name so processes of other stacks stay untouched.
+pub fn kill_pid(pid: u32) -> Result<(), String> {
+    if !pid_alive(pid) {
+        return Ok(());
+    }
+    send_signal(pid, "-TERM")?;
+    let deadline = Instant::now() + Duration::from_secs(8);
+    while Instant::now() < deadline {
+        if !pid_alive(pid) {
+            return Ok(());
+        }
+        std::thread::sleep(Duration::from_millis(100));
+    }
+    send_signal(pid, "-KILL")?;
+    std::thread::sleep(Duration::from_millis(200));
+    if pid_alive(pid) {
+        Err(format!("Process {pid} did not exit after SIGKILL"))
+    } else {
+        Ok(())
+    }
+}
+
+/// Port conflict detection.
+///
 /// Returns Ok(()) if `port` on 127.0.0.1 is free; otherwise returns a
-/// human-readable error mentioning the service name.
+/// human-readable error mentioning the service name. Ports below 1024 need
+/// root (or a lowered `net.ipv4.ip_unprivileged_port_start`), which is
+/// reported explicitly instead of as a generic "port in use".
 pub fn ensure_port_available(port: u16, service: &str) -> Result<(), String> {
     use std::net::{Ipv4Addr, SocketAddrV4, TcpListener};
 
@@ -183,48 +209,65 @@ pub fn ensure_port_available(port: u16, service: &str) -> Result<(), String> {
             drop(listener);
             Ok(())
         }
+        Err(e) if e.kind() == std::io::ErrorKind::PermissionDenied => Err(format!(
+            "{service} cannot use port {port}: ports below 1024 require root on Linux. \
+             Choose a port such as 8080 in the settings, or run \
+             `sudo sysctl net.ipv4.ip_unprivileged_port_start=80` to allow it."
+        )),
         Err(e) => Err(format!(
             "Port {port} is already in use, so {service} cannot start. \
-             Close the program holding that port (often a system Apache or \
-             MySQL service, Docker, or a previous LinuxDevStackBox instance) \
-             and try again. Underlying error: {e}"
+             Close the program holding that port (often a system apache2/mysql \
+             service, another web server, or a previous LinuxDevStackBox \
+             instance) and try again. Underlying error: {e}"
         )),
     }
 }
 
-/// True when a TCP port accepts connections on 127.0.0.1.
-pub fn is_port_listening(port: u16) -> bool {
-    use std::net::{Ipv4Addr, SocketAddrV4, TcpStream};
-    let addr = SocketAddrV4::new(Ipv4Addr::LOCALHOST, port);
-    TcpStream::connect_timeout(&addr.into(), std::time::Duration::from_millis(250)).is_ok()
+/// Lists TCP listeners as `(port, pid)` from `ss -ltnpH`, used to report which
+/// process holds a port.
+pub fn listening_pid_for_port(port: u16) -> Option<u32> {
+    let out = Command::new("ss").args(["-ltnpH"]).output().ok()?;
+    let text = String::from_utf8_lossy(&out.stdout);
+    let suffix = format!(":{port}");
+    for line in text.lines() {
+        let cols: Vec<&str> = line.split_whitespace().collect();
+        if cols.len() < 5 || !cols[3].ends_with(&suffix) {
+            continue;
+        }
+        if let Some(idx) = line.find("pid=") {
+            let digits: String = line[idx + 4..].chars().take_while(|c| c.is_ascii_digit()).collect();
+            if let Ok(pid) = digits.parse() {
+                return Some(pid);
+            }
+        }
+    }
+    None
 }
 
 #[cfg(test)]
 mod service_probe_tests {
-    use super::{is_diagnostic_process, sanitize_image_name};
+    use super::is_diagnostic_process;
+
+    fn argv(parts: &[&str]) -> Vec<String> {
+        parts.iter().map(|s| s.to_string()).collect()
+    }
 
     #[test]
     fn probes_are_not_servers() {
         for flag in ["-v", "-V", "-t", "-S", "-M"] {
-            assert!(is_diagnostic_process("httpd", &format!("/usr/bin/httpd {flag}")));
+            assert!(is_diagnostic_process("apache2", &argv(&["/usr/sbin/apache2", flag])));
+            assert!(is_diagnostic_process("httpd", &argv(&["/usr/sbin/httpd", flag])));
         }
         for flag in ["--version", "--help", "--initialize-insecure", "--validate-config"] {
-            assert!(is_diagnostic_process("mariadbd", &format!("mariadbd {flag}")));
+            assert!(is_diagnostic_process("mysqld", &argv(&["mysqld", flag])));
         }
     }
 
     #[test]
-    fn real_servers_and_quoted_paths_remain_visible() {
-        assert!(!is_diagnostic_process("httpd", "httpd -DFOREGROUND -f /etc/linuxdevstackbox/httpd.conf"));
-        assert!(!is_diagnostic_process("mariadbd", "mariadbd --defaults-file=/home/u/.config/linuxdevstackbox/my.cnf"));
-        assert!(!is_diagnostic_process("httpd", ""));
-    }
-
-    #[test]
-    fn image_names_are_sanitized() {
-        assert!(sanitize_image_name("httpd"));
-        assert!(sanitize_image_name("mariadbd"));
-        assert!(!sanitize_image_name(""));
-        assert!(!sanitize_image_name("httpd; rm -rf /"));
+    fn real_servers_remain_visible() {
+        assert!(!is_diagnostic_process("apache2", &argv(&["apache2", "-d", "/srv/apache", "-f", "/x -v/httpd.conf"])));
+        assert!(!is_diagnostic_process("apache2", &argv(&["apache2", "-k", "start"])));
+        assert!(!is_diagnostic_process("mysqld", &argv(&["mysqld", "--defaults-file=/x/my.cnf"])));
+        assert!(!is_diagnostic_process("apache2", &[]));
     }
 }
