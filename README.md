@@ -1,72 +1,75 @@
 # LinuxDevStackBox
 
-![License: MIT](https://img.shields.io/github/license/DevStackBox/DevStackBox?style=flat-square)
+[English](README.md) · [فارسی](README.fa.md)
+
+![License: MIT](https://img.shields.io/github/license/mamsm-dev/LinuxDevStackBox?style=flat-square)
 ![Linux](https://img.shields.io/badge/Linux-AppImage-FCC624?style=flat-square&logo=linux&logoColor=black)
+![Release](https://img.shields.io/github/v/release/mamsm-dev/LinuxDevStackBox?style=flat-square)
 
-**A local PHP development environment for Linux** - Apache, MySQL/MariaDB, phpMyAdmin and PHP in one MIT-licensed desktop app, distributed as an AppImage.
+**A local PHP development environment for Linux.** Apache, MySQL/MariaDB, phpMyAdmin and PHP, managed from one desktop app and distributed as a single AppImage. A free alternative to XAMPP/LAMPP with a modern UI.
 
-LinuxDevStackBox is a Linux port of [DevStackBox](https://github.com/DevStackBox/DevStackBox) by Nomad Programmer.
+LinuxDevStackBox is a Linux port of [DevStackBox](https://github.com/DevStackBox/DevStackBox) (originally for Windows) by Nomad Programmer, maintained by [mamsm-dev](https://github.com/mamsm-dev). It is built with Tauri (Rust) and React.
 
-## Stack
-
-Server binaries are resolved in this order: a copy bundled with the app, then the system installation.
-
-| Component   | Linux package examples |
-| ----------- | ---------------------- |
-| Apache 2.4  | `apache2` (Debian/Ubuntu), `httpd` (Fedora) |
-| MySQL / MariaDB | `mysql-server` or `mariadb-server` |
-| PHP (CGI)   | `php8.3-cgi php8.3-cli` (more versions from your distribution or the Ondrej PPA) |
-| phpMyAdmin  | bundled |
-
-Extra PHP versions are not downloaded by the app; install them with your package manager and they are detected automatically.
-
-## Run
-
-1. Install the packages above (`sudo apt install apache2 mariadb-server php-cgi php-cli` on Debian/Ubuntu).
-2. Start Apache and MySQL from the app.
-3. Open `http://localhost:8080/` and `http://localhost:8080/phpmyadmin/` (the app shows the actual port; ports below 1024 need root or `net.ipv4.ip_unprivileged_port_start`).
-
-Web projects live in `~/LinuxDevStackBox/www`; configuration, logs and databases in `~/.local/share/linuxdevstackbox`. Virtual hosts edit `/etc/hosts` after authentication (pkexec).
-
-## Build
-
-```bash
-npm install
-npm run tauri build   # produces an AppImage when the AppImage bundle target is enabled
-```
-
-Requires Rust, Node.js and the Tauri Linux prerequisites (webkit2gtk-4.1, libayatana-appindicator, librsvg2).
+> **Status:** early port. It builds and the AppImage starts, but it has had limited testing on real systems. Please report problems in [Issues](https://github.com/mamsm-dev/LinuxDevStackBox/issues).
 
 ## Features
 
-- One desktop UI for services, configs, SSL, backups, and projects
-- Import from XAMPP/LAMPP (`Settings → Import from XAMPP`)
-- No telemetry
+- Start, stop and monitor Apache, MySQL/MariaDB and PHP from one window, with a system tray icon
+- Multiple PHP versions (8.2 to 8.5), selectable per project
+- Project workspaces and virtual hosts (`.test` domains via `/etc/hosts`)
+- Local HTTPS with a generated local CA
+- Database manager (create, import, export, backup, users and grants) and bundled phpMyAdmin
+- Config editor with backups, log viewer, full backups and a built-in terminal
+- Import from XAMPP/LAMPP (`/opt/lampp`)
+- Persian (RTL) and English interface; no telemetry
 
-## Project workspaces
+## Install
 
-Connect existing folders, manage `.test` hosts and trusted HTTPS, and select an installed PHP version per website. Install extra PHP runtimes with your package manager first. The terminal currently uses global PHP.
+1. Install the services. The AppImage does **not** bundle Apache, MySQL/MariaDB or PHP; it uses the ones on your system:
 
-See the [project guide](docs/getting-started/projects.mdx), [project roadmap](PROJECT-ROADMAP.md), and [release validation](docs/RELEASE-VALIDATION.md). Framework installers, database linking and Git/SSH are future work. Frameworks will download on demand; AI integration is deferred.
+   | Component | Debian/Ubuntu | Fedora | Arch |
+   | --- | --- | --- | --- |
+   | Apache | `apache2` | `httpd` | `apache` |
+   | Database | `mariadb-server` or `mysql-server` | `mariadb-server` | `mariadb` |
+   | PHP | `php-cgi php-cli php-mysql` | `php-cgi php-cli php-mysqlnd` | `php php-cgi` |
 
-## v0.1.17
+   Or run `bash scripts/install-deps.sh`, which also disables the distribution's own Apache/MariaDB services so they do not clash with the app.
+2. Download the `.AppImage` from the [latest release](https://github.com/mamsm-dev/LinuxDevStackBox/releases/latest).
+3. Run it:
 
-Released on 23 October 2026, v0.1.17 fixes Apache ancestor `.htaccess` handling and adds configuration/log diagnostics. Published artifact verification and remaining installed-site checks are tracked in [release validation](docs/RELEASE-VALIDATION.md). See the [documentation and cleanup audit](docs/development/v0.1.17-docs-audit.md) for readiness gates and proposed cleanup; no development files were deleted.
+   ```bash
+   chmod +x LinuxDevStackBox_*.AppImage
+   ./LinuxDevStackBox_*.AppImage
+   ```
 
-## Releasing
+   If it does not start, install FUSE (`sudo apt install libfuse2`). If the window is blank, start it with `WEBKIT_DISABLE_DMABUF_RENDERER=1`.
 
-Maintainers: follow [Release process](docs/development/release-process.mdx) and the [Release runbook](docs/development/release-runbook.mdx) for signed builds, `finalize-release`, and GitHub publication. Download links for users always resolve to the [latest published GitHub release](https://github.com/DevStackBox/DevStackBox/releases/latest).
+## Usage
 
-## Diagnostics and configuration safety
+- Start Apache and MySQL from the dashboard, then open `http://localhost:8080/` and `http://localhost:8080/phpmyadmin/`. The app shows the actual port.
+- Apache uses port 8080 (HTTPS 8443) unless your system allows unprivileged ports below 1024 (`sudo sysctl net.ipv4.ip_unprivileged_port_start=80`).
+- Web projects live in `~/LinuxDevStackBox/www`. Configuration, logs and databases live in `~/.local/share/linuxdevstackbox`.
+- Editing `/etc/hosts` and trusting the HTTPS certificate ask for your password through `pkexec`.
+- Extra PHP versions are not downloaded by the app. Install them with your package manager (for example `php8.4-cgi` from the Ondřej PPA) and they are detected automatically.
 
-Read Apache and the selected PHP runtime error log from project details. Site changes preserve recovery copies and stop before overwriting unrelated hosts missing from saved records. See [release notes](CHANGELOG.md) for scope and limitations.
+## Build from source
+
+```bash
+bash scripts/install-deps.sh build   # Tauri build dependencies + runtime packages
+npm ci
+bash scripts/build-appimage.sh       # output: src-tauri/target/release/bundle/appimage/
+```
+
+For development use `npm run tauri:dev`. Requires Rust, Node.js 18+, webkit2gtk-4.1, libayatana-appindicator and librsvg2.
+
+## Releases
+
+Releases are built by GitHub Actions. Push a tag such as `v0.2.0`, or run the **Release AppImage** workflow manually, and the AppImage plus a `.sha256` file are attached to the release.
 
 ## Contributing
 
-See [CONTRIBUTING.md](CONTRIBUTING.md).
+See [CONTRIBUTING.md](CONTRIBUTING.md). Security reports: [SECURITY.md](SECURITY.md). Privacy: [PRIVACY.md](PRIVACY.md). Changes: [CHANGELOG.md](CHANGELOG.md).
 
-## Links
+## License
 
-- Website: [devstackbox.com](https://www.devstackbox.com)
-- Issues: [GitHub Issues](https://github.com/DevStackBox/DevStackBox/issues)
-- Security: [SECURITY.md](SECURITY.md) · Privacy: [PRIVACY.md](PRIVACY.md)
+MIT. Copyright (c) 2026 DevStackBox (original project) and mamsm-dev (Linux port). See [LICENSE](LICENSE).
