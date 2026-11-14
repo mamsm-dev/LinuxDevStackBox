@@ -4,9 +4,9 @@
   "description": "A lightweight, portable, open-source local development environment for PHP developers on Linux (Linux port of DevStackBox)",
   "type": "module",
   "scripts": {
-    "predev": "node scripts/sync-logo.mjs && node scripts/stage-phpmyadmin.mjs",
+    "predev": "node scripts/sync-logo.mjs && node scripts/fetch-phpmyadmin-dist.mjs && node scripts/stage-phpmyadmin.mjs",
     "dev": "vite",
-    "prebuild": "node scripts/sync-logo.mjs && node scripts/stage-phpmyadmin.mjs",
+    "prebuild": "node scripts/sync-logo.mjs && node scripts/fetch-phpmyadmin-dist.mjs && node scripts/stage-phpmyadmin.mjs",
     "build": "tsc && vite build",
     "test": "vitest run",
     "test:packaging": "node --test scripts/stage-phpmyadmin.check.mjs",

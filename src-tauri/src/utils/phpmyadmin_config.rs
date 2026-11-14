@@ -55,7 +55,9 @@ pub fn phpmyadmin_root() -> PathBuf {
     let copy = get_user_data_root().join("phpmyadmin-app");
     let marker = copy.join(".ldsb-copied-version");
     let version = env!("CARGO_PKG_VERSION");
-    let current = std::fs::read_to_string(&marker).map(|v| v.trim() == version).unwrap_or(false);
+    // Also refresh a copy made by an older build that lacked the compiled JS.
+    let has_js = !source.join("js").join("dist").is_dir() || copy.join("js").join("dist").is_dir();
+    let current = has_js && std::fs::read_to_string(&marker).map(|v| v.trim() == version).unwrap_or(false);
     if !current {
         // Preserve a user-edited config across refreshes.
         let saved = std::fs::read(copy.join("config.inc.php")).ok();
