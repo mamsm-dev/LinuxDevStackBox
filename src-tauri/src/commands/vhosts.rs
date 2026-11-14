@@ -137,7 +137,7 @@ pub fn render_site(site: &VhostEntry, tls: bool) -> Result<String, String> {
     };
     let config = to_apache_path(&user_config_dir());
     let action = super::apache::php_cgi_action(&runtime);
-    let mut conf=format!("\n<VirtualHost *:{port}>\nServerName {}\nDocumentRoot \"{root}\"\n<Directory \"{root}\">\nOptions -Indexes +FollowSymLinks\nAllowOverride All\nRequire local\nDirectoryIndex index.php index.html index.htm\n</Directory>\nScriptAlias /php/ \"{php}/\"\n<Directory \"{php}\">\nOptions +ExecCGI\nRequire local\n</Directory>\nAction php-script {action}\nAddHandler php-script .php\nAddType application/x-httpd-php .php\nSetEnv PHPRC \"{phprc}\"\n",site.domain);
+    let mut conf=format!("\n<VirtualHost *:{port}>\nServerName {}\nDocumentRoot \"{root}\"\n<Directory \"{root}\">\nOptions -Indexes +FollowSymLinks\nAllowOverride All\nRequire local\nDirectoryIndex index.php index.html index.htm\n</Directory>\nScriptAlias /php/ \"{php}/\"\n<Directory \"{php}\">\nOptions +ExecCGI +FollowSymLinks\nRequire local\n</Directory>\nAction php-script {action}\nAddHandler php-script .php\nAddType application/x-httpd-php .php\nSetEnv PHPRC \"{phprc}\"\n",site.domain);
     if !site.aliases.is_empty() {
         conf.push_str(&format!("ServerAlias {}\n", site.aliases.join(" ")));
     }

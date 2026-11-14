@@ -8,14 +8,14 @@ use crate::types::ServiceInfo;
 use crate::utils::config_ports::{apache_listen_port, default_http_port};
 use crate::utils::config_version::needs_config_migration;
 use crate::utils::paths::{
-    active_php_dir, get_apache_exe, get_apache_modules_dir, get_installation_path, get_mime_types_file,
+    get_apache_exe, get_apache_modules_dir, get_installation_path, get_mime_types_file,
     prepare_apache_server_root, user_config_dir, user_logs_dir, user_www_dir,
 };
 use crate::utils::process::{
     create_hidden_command, ensure_port_available, find_our_processes, is_our_process_running, kill_pid,
 };
 
-pub const APACHE_CONFIG_VERSION: u32 = 10;
+pub const APACHE_CONFIG_VERSION: u32 = 11;
 
 /// Path (relative to the `/php/` ScriptAlias) of the php-cgi binary inside a
 /// PHP runtime dir, e.g. `/php/php-cgi` or `/php/bin/php-cgi`.
@@ -372,8 +372,11 @@ pub async fn create_default_apache_config() -> Result<(), String> {
         .unwrap_or_default();
 
     // PHP-CGI: the active runtime dir holds php-cgi (or bin/php-cgi).
-    let php_cgi_dir = active_php_dir();
-    let php_action = php_cgi_action(&php_cgi_dir);
+    // Always go through the stable `current` symlink (maintained by the PHP
+    // module, flat `php-cgi` inside), so the config stays valid when the active
+    // PHP version changes or runtime dirs are created after this file.
+    let php_cgi_dir = crate::utils::paths::user_php_runtime_root().join("current");
+    let php_action = format!("/php/{}", crate::utils::paths::PHP_CGI_NAME);
 
     let config_content = format!(
         r#"{override_baseline}# configVersion: {version}
@@ -413,7 +416,7 @@ SetEnv PHPRC "{user_config}/"
 
 <Directory "{php_cgi_dir_str}">
     AllowOverride None
-    Options ExecCGI
+    Options +ExecCGI +FollowSymLinks
     Require all granted
 </Directory>
 
