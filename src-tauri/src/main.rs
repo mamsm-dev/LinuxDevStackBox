@@ -1,4 +1,20 @@
+/// The AppImage ships its own WebKitGTK (built on Ubuntu 22.04). On newer
+/// distros/GPU drivers (Wayland, NVIDIA, recent Mesa) its web process crashes
+/// with a blank window. These switches make WebKit fall back to the safe
+/// renderer; users can override them by exporting the variables themselves.
+fn apply_webkit_workarounds() {
+    for (key, value) in [
+        ("WEBKIT_DISABLE_DMABUF_RENDERER", "1"),
+        ("WEBKIT_DISABLE_COMPOSITING_MODE", "1"),
+    ] {
+        if std::env::var_os(key).is_none() {
+            std::env::set_var(key, value);
+        }
+    }
+}
+
 fn main() {
+    apply_webkit_workarounds();
     let args: Vec<String> = std::env::args().collect();
     if args.get(1).map(String::as_str) == Some("--hosts-operation") {
         let result = if args.len() == 4 { linuxdevstackbox_lib::commands::vhosts::elevated_hosts_change(&args[3], &args[2]) } else { Err("Invalid arguments".into()) };
