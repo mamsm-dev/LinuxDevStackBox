@@ -1,0 +1,30 @@
+# Maintainer: mamsm-dev
+# Packages an already built release binary (see .github/workflows/release.yml).
+# Build first:  npx tauri build --no-bundle --ci
+# Then:         cd packaging/arch && makepkg -f
+pkgname=linuxdevstackbox
+pkgver=${LDSB_VERSION:-0.1.22}
+pkgrel=1
+pkgdesc='Local PHP development environment (Apache, MariaDB, phpMyAdmin, PHP) - Linux port of DevStackBox'
+arch=('x86_64')
+url='https://github.com/mamsm-dev/LinuxDevStackBox'
+license=('MIT')
+depends=('webkit2gtk-4.1' 'gtk3' 'libayatana-appindicator' 'apache' 'mariadb' 'php' 'php-cgi' 'polkit' 'xdg-utils')
+optdepends=('nss: trust the local HTTPS CA in Firefox/Chromium'
+            'openssl: local HTTPS certificates')
+options=('!strip' '!debug')
+
+package() {
+  local root="$startdir/../.."
+  install -Dm755 "$root/src-tauri/target/release/linuxdevstackbox" "$pkgdir/usr/bin/linuxdevstackbox"
+
+  # Resources are looked up in <prefix>/lib/LinuxDevStackBox/
+  install -d "$pkgdir/usr/lib/LinuxDevStackBox"
+  cp -r "$root/packaging/phpmyadmin-runtime" "$pkgdir/usr/lib/LinuxDevStackBox/phpmyadmin"
+  cp -r "$root/www" "$pkgdir/usr/lib/LinuxDevStackBox/www"
+
+  install -Dm644 "$startdir/linuxdevstackbox.desktop" "$pkgdir/usr/share/applications/linuxdevstackbox.desktop"
+  install -Dm644 "$root/src-tauri/icons/128x128.png" "$pkgdir/usr/share/icons/hicolor/128x128/apps/linuxdevstackbox.png"
+  install -Dm644 "$root/src-tauri/icons/128x128@2x.png" "$pkgdir/usr/share/icons/hicolor/256x256/apps/linuxdevstackbox.png"
+  install -Dm644 "$root/LICENSE" "$pkgdir/usr/share/licenses/$pkgname/LICENSE"
+}

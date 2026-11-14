@@ -25,24 +25,26 @@ LinuxDevStackBox is a Linux port of [DevStackBox](https://github.com/DevStackBox
 
 ## Install
 
-1. Install the services. The AppImage does **not** bundle Apache, MySQL/MariaDB or PHP; it uses the ones on your system:
+Download the package for your distribution from the [latest release](https://github.com/mamsm-dev/LinuxDevStackBox/releases/latest):
 
-   | Component | Debian/Ubuntu | Fedora | Arch |
-   | --- | --- | --- | --- |
-   | Apache | `apache2` | `httpd` | `apache` |
-   | Database | `mariadb-server` or `mysql-server` | `mariadb-server` | `mariadb` |
-   | PHP | `php-cgi php-cli php-mysql` | `php-cgi php-cli php-mysqlnd` | `php php-cgi` |
+| Distribution | File | Install |
+| --- | --- | --- |
+| Debian / Ubuntu / Mint | `.deb` | `sudo apt install ./LinuxDevStackBox_*.deb` |
+| Fedora / openSUSE / RHEL | `.rpm` | `sudo dnf install ./LinuxDevStackBox-*.rpm` |
+| Arch / Manjaro / EndeavourOS | `.pkg.tar.zst` | `sudo pacman -U linuxdevstackbox-*.pkg.tar.zst` |
+| Any distribution | `.AppImage` | `chmod +x LinuxDevStackBox_*.AppImage && ./LinuxDevStackBox_*.AppImage` |
 
-   Or run `bash scripts/install-deps.sh`, which also disables the distribution's own Apache/MariaDB services so they do not clash with the app.
-2. Download the `.AppImage` from the [latest release](https://github.com/mamsm-dev/LinuxDevStackBox/releases/latest).
-3. Run it:
+The `.deb`, `.rpm` and Arch packages install Apache, MariaDB/MySQL and `php-cgi` as dependencies. The **AppImage does not bundle them**; install them yourself:
 
-   ```bash
-   chmod +x LinuxDevStackBox_*.AppImage
-   ./LinuxDevStackBox_*.AppImage
-   ```
+| Component | Debian/Ubuntu | Fedora | Arch |
+| --- | --- | --- | --- |
+| Apache | `apache2` | `httpd` | `apache` |
+| Database | `mariadb-server` or `mysql-server` | `mariadb-server` | `mariadb` |
+| PHP | `php-cgi php-cli php-mysql` | `php-cgi php-cli php-mysqlnd` | `php php-cgi` |
 
-   If it does not start, install FUSE (`sudo apt install libfuse2`). If the window is blank, start it with `WEBKIT_DISABLE_DMABUF_RENDERER=1`.
+Or run `bash scripts/install-deps.sh`, which also disables the distribution's own Apache/MariaDB services so they do not clash with the app (they would otherwise compete for port 3306).
+
+AppImage notes: if it does not start, install FUSE (`sudo apt install libfuse2`). If the window is blank, start it with `WEBKIT_DISABLE_DMABUF_RENDERER=1`.
 
 ## Usage
 
@@ -64,7 +66,7 @@ For development use `npm run tauri:dev`. Requires Rust, Node.js 18+, webkit2gtk-
 
 ## Releases
 
-Releases are built by GitHub Actions. Push a tag such as `v0.2.0`, or run the **Release AppImage** workflow manually, and the AppImage plus a `.sha256` file are attached to the release.
+Releases are built by GitHub Actions. Push a tag such as `v0.2.0`, or run the **Release packages** workflow manually, and the AppImage, `.deb`, `.rpm`, Arch package and `SHA256SUMS.txt` are attached to the release.
 
 ## Contributing
 

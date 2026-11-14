@@ -27,7 +27,16 @@ LinuxDevStackBox نسخه لینوکسی پروژه [DevStackBox](https://github
 
 ## نصب
 
-۱. سرویس‌ها را نصب کنید. فایل AppImage خودش Apache، MySQL/MariaDB و PHP را **همراه ندارد** و از نسخه‌های نصب‌شده روی سیستم شما استفاده می‌کند:
+بسته مناسب توزیع خودتان را از [آخرین ریلیز](https://github.com/mamsm-dev/LinuxDevStackBox/releases/latest) دانلود کنید:
+
+| توزیع | فایل | نصب |
+| --- | --- | --- |
+| Debian / Ubuntu / Mint | `.deb` | `sudo apt install ./LinuxDevStackBox_*.deb` |
+| Fedora / openSUSE / RHEL | `.rpm` | `sudo dnf install ./LinuxDevStackBox-*.rpm` |
+| Arch / Manjaro / EndeavourOS | `.pkg.tar.zst` | `sudo pacman -U linuxdevstackbox-*.pkg.tar.zst` |
+| هر توزیعی | `.AppImage` | `chmod +x LinuxDevStackBox_*.AppImage && ./LinuxDevStackBox_*.AppImage` |
+
+بسته‌های `.deb`، `.rpm` و Arch خودشان Apache، MariaDB/MySQL و `php-cgi` را به‌عنوان وابستگی نصب می‌کنند. فایل **AppImage آن‌ها را همراه ندارد** و باید خودتان نصب کنید:
 
 | جزء | Debian/Ubuntu | Fedora | Arch |
 | --- | --- | --- | --- |
@@ -35,22 +44,9 @@ LinuxDevStackBox نسخه لینوکسی پروژه [DevStackBox](https://github
 | پایگاه داده | `mariadb-server` یا `mysql-server` | `mariadb-server` | `mariadb` |
 | PHP | `php-cgi php-cli php-mysql` | `php-cgi php-cli php-mysqlnd` | `php php-cgi` |
 
-یا دستور `bash scripts/install-deps.sh` را اجرا کنید. این دستور سرویس‌های خود توزیع (Apache/MariaDB) را هم غیرفعال می‌کند تا با برنامه تداخل نداشته باشند.
+یا `bash scripts/install-deps.sh` را اجرا کنید. این دستور سرویس‌های خود توزیع (Apache/MariaDB) را هم غیرفعال می‌کند تا با برنامه تداخل نداشته باشند (مثلاً روی پورت ۳۳۰۶).
 
-۲. فایل `.AppImage` را از [آخرین ریلیز](https://github.com/mamsm-dev/LinuxDevStackBox/releases/latest) دانلود کنید.
-
-۳. اجرا کنید:
-
-</div>
-
-```bash
-chmod +x LinuxDevStackBox_*.AppImage
-./LinuxDevStackBox_*.AppImage
-```
-
-<div dir="rtl">
-
-اگر اجرا نشد، FUSE را نصب کنید (`sudo apt install libfuse2`). اگر پنجره خالی (سیاه) بود، با `WEBKIT_DISABLE_DMABUF_RENDERER=1` اجرا کنید.
+نکات AppImage: اگر اجرا نشد، FUSE را نصب کنید (`sudo apt install libfuse2`). اگر پنجره خالی (سیاه) بود، با `WEBKIT_DISABLE_DMABUF_RENDERER=1` اجرا کنید.
 
 ## استفاده
 
@@ -76,7 +72,7 @@ bash scripts/build-appimage.sh       # خروجی: src-tauri/target/release/bund
 
 ## ریلیزها
 
-ریلیزها با GitHub Actions ساخته می‌شوند. یک تگ مثل `v0.2.0` را push کنید یا workflow به نام **Release AppImage** را دستی اجرا کنید؛ فایل AppImage و یک فایل `.sha256` به ریلیز اضافه می‌شود.
+ریلیزها با GitHub Actions ساخته می‌شوند. یک تگ مثل `v0.2.0` را push کنید یا workflow به نام **Release packages** را دستی اجرا کنید؛ فایل‌های AppImage، `.deb`، `.rpm`، بسته Arch و `SHA256SUMS.txt` به ریلیز اضافه می‌شوند.
 
 ## مشارکت
 

@@ -31,7 +31,9 @@
     "active": true,
     "createUpdaterArtifacts": false,
     "targets": [
-      "appimage"
+      "appimage",
+      "deb",
+      "rpm"
     ],
     "publisher": "Nomad Programmer",
     "icon": [
@@ -51,9 +53,41 @@
     "longDescription": "Apache, MySQL/MariaDB, phpMyAdmin and PHP 8.2-8.5 manager for Linux. Linux port of DevStackBox.",
     "linux": {
       "appimage": {
-        "bundleMediaFramework": false,
-        "files": {}
+        "bundleMediaFramework": false
+      },
+      "deb": {
+        "section": "devel",
+        "depends": [
+          "apache2",
+          "mariadb-server | mysql-server",
+          "php-cgi",
+          "php-cli",
+          "php-mysql",
+          "policykit-1 | polkitd",
+          "xdg-utils"
+        ],
+        "recommends": [
+          "libnss3-tools",
+          "openssl"
+        ]
+      },
+      "rpm": {
+        "depends": [
+          "httpd",
+          "mariadb-server",
+          "php-cgi",
+          "php-cli",
+          "php-mysqlnd",
+          "polkit",
+          "xdg-utils"
+        ],
+        "recommends": [
+          "nss-tools",
+          "openssl"
+        ]
       }
-    }
+    },
+    "license": "MIT",
+    "homepage": "https://github.com/mamsm-dev/LinuxDevStackBox"
   }
 }

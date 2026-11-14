@@ -11,4 +11,4 @@ function run(command, args, env = process.env) {
 }
 run(process.execPath, [resolve(root, "scripts/verify-release.mjs")]);
 // linuxdeploy's bundled strip is too old for some modern distros (.relr.dyn).
-run(process.execPath, [tauriCli, "build", "--ci", "--bundles", "appimage"], { NO_STRIP: "true", ...process.env });
+run(process.execPath, [tauriCli, "build", "--ci", "--bundles", process.env.BUNDLES || "appimage,deb,rpm"], { NO_STRIP: "true", ...process.env });

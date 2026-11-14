@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=LinuxDevStackBox
+Comment=Local PHP development environment (Apache, MariaDB, phpMyAdmin, PHP)
+Exec=linuxdevstackbox
+Icon=linuxdevstackbox
+Terminal=false
+Categories=Development;WebDevelopment;
+StartupWMClass=linuxdevstackbox

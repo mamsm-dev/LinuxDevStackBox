@@ -1,7 +1,7 @@
-name: Release AppImage
+name: Release packages
 
-# Push a tag like v0.2.0 (or run manually) to build the AppImage on GitHub
-# and publish it in the Releases section.
+# Push a tag like v0.2.0 (or run manually) to build AppImage, .deb, .rpm and an
+# Arch Linux package on GitHub and publish them in the Releases section.
 on:
   push:
     tags: ["v*"]
@@ -15,7 +15,8 @@ permissions:
   contents: write
 
 jobs:
-  appimage:
+  linux-bundles:
+    name: AppImage, deb, rpm
     runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v4
@@ -36,7 +37,7 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y build-essential curl wget file libwebkit2gtk-4.1-dev \
             libgtk-3-dev librsvg2-dev libayatana-appindicator3-dev libssl-dev libxdo-dev \
-            libfuse2
+            libfuse2 rpm
 
       - run: npm ci
 
@@ -47,31 +48,80 @@ jobs:
           node scripts/stage-phpmyadmin.mjs
           cargo check --manifest-path src-tauri/Cargo.toml --lib
 
-      - name: Build AppImage
+      - name: Build AppImage, deb and rpm
         run: npm run build:release
 
-      - name: Collect artifact
-        id: artifact
+      - name: Collect artifacts
         run: |
           set -euo pipefail
-          file=$(ls src-tauri/target/release/bundle/appimage/*.AppImage | head -n1)
-          chmod +x "$file"
-          sha256sum "$file" > "$file.sha256"
-          echo "file=$file" >> "$GITHUB_OUTPUT"
+          mkdir -p dist-release
+          b=src-tauri/target/release/bundle
+          cp "$b"/appimage/*.AppImage "$b"/deb/*.deb "$b"/rpm/*.rpm dist-release/
+          chmod +x dist-release/*.AppImage
+          ls -l dist-release
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: linux-bundles
+          path: dist-release/*
+
+  arch-package:
+    name: Arch Linux package
+    runs-on: ubuntu-latest
+    container: archlinux:base-devel
+    steps:
+      - name: Install dependencies
+        run: |
+          pacman -Syu --noconfirm --needed git nodejs npm rust webkit2gtk-4.1 gtk3 librsvg \
+            libayatana-appindicator openssl xdotool tar zstd
+
+      - uses: actions/checkout@v4
+
+      - name: Build as unprivileged user (makepkg refuses root)
+        run: |
+          set -euo pipefail
+          useradd -m builder
+          chown -R builder:builder "$GITHUB_WORKSPACE"
+          VERSION=$(node -p "require('./package.json').version")
+          su builder -c "cd '$GITHUB_WORKSPACE' && npm ci && npx tauri build --no-bundle --ci"
+          su builder -c "cd '$GITHUB_WORKSPACE/packaging/arch' && LDSB_VERSION=$VERSION makepkg -f --nodeps --noconfirm"
+          mkdir -p dist-release
+          cp packaging/arch/*.pkg.tar.zst dist-release/
+          ls -l dist-release
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: arch-package
+          path: dist-release/*
+
+  publish:
+    needs: [linux-bundles, arch-package]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          merge-multiple: true
+
+      - name: Checksums
+        run: |
+          cd artifacts
+          sha256sum * > SHA256SUMS.txt
+          ls -l
 
       - name: Publish GitHub Release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
           TAG: ${{ github.event.inputs.tag || github.ref_name }}
         run: |
           set -euo pipefail
-          file="${{ steps.artifact.outputs.file }}"
           if gh release view "$TAG" >/dev/null 2>&1; then
-            gh release upload "$TAG" "$file" "$file.sha256" --clobber
+            gh release upload "$TAG" artifacts/* --clobber
           else
-            gh release create "$TAG" "$file" "$file.sha256" \
+            gh release create "$TAG" artifacts/* \
               --target "${{ github.sha }}" \
               --title "LinuxDevStackBox $TAG" \
               --generate-notes \
-              --notes "Linux AppImage build. Requires system Apache, MariaDB/MySQL and php-cgi (see README). Run: chmod +x LinuxDevStackBox*.AppImage && ./LinuxDevStackBox*.AppImage"
+              --notes "Packages: AppImage (any distro), .deb (Debian/Ubuntu), .rpm (Fedora/openSUSE), .pkg.tar.zst (Arch). Requires Apache, MariaDB/MySQL and php-cgi (installed automatically by the native packages). See README."
           fi
