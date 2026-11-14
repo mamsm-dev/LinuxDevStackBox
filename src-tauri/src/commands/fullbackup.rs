@@ -421,7 +421,7 @@ pub async fn delete_full_backup(path: String) -> Result<(), String> {
 pub async fn open_backups_folder() -> Result<(), String> {
     let dir = full_backups_dir();
     std::fs::create_dir_all(&dir).ok();
-    std::process::Command::new("xdg-open")
+    crate::utils::process::host_command("xdg-open")
         .arg(dir)
         .spawn()
         .map_err(|e| format!("Failed to open folder: {}", e))?;

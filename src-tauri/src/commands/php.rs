@@ -14,7 +14,6 @@ use std::collections::BTreeMap;
 use std::fs;
 use std::os::unix::fs::PermissionsExt;
 use std::path::{Path, PathBuf};
-use std::process::Command;
 
 use serde::Serialize;
 use tauri::{AppHandle, Emitter};
@@ -235,7 +234,7 @@ fn set_symlink(target: &Path, link: &Path) -> Result<(), String> {
 fn config_extension_dir(branch: &str, install: &PhpInstall) -> Option<PathBuf> {
     // 1. Ask the CLI (ignoring every ini, so this is the compiled-in default).
     if let Some(cli) = &install.cli {
-        if let Ok(out) = Command::new(cli).args(["-n", "-r", "echo ini_get('extension_dir');"]).output() {
+        if let Ok(out) = crate::utils::process::host_command(cli).args(["-n", "-r", "echo ini_get('extension_dir');"]).output() {
             let dir = PathBuf::from(String::from_utf8_lossy(&out.stdout).trim());
             if out.status.success() && dir.is_dir() {
                 return Some(dir);
@@ -246,12 +245,12 @@ fn config_extension_dir(branch: &str, install: &PhpInstall) -> Option<PathBuf> {
     let n = branch.replace('.', "");
     for name in [format!("php-config{branch}"), format!("php-config{n}"), "php-config".to_string()] {
         let Some(cfg) = find_in_path(&name) else { continue };
-        let version = Command::new(&cfg).arg("--version").output().ok()
+        let version = crate::utils::process::host_command(&cfg).arg("--version").output().ok()
             .map(|o| String::from_utf8_lossy(&o.stdout).trim().to_string()).unwrap_or_default();
         if !version.starts_with(&format!("{branch}.")) {
             continue;
         }
-        if let Ok(out) = Command::new(&cfg).arg("--extension-dir").output() {
+        if let Ok(out) = crate::utils::process::host_command(&cfg).arg("--extension-dir").output() {
             let dir = PathBuf::from(String::from_utf8_lossy(&out.stdout).trim());
             if dir.is_dir() {
                 return Some(dir);
@@ -813,7 +812,7 @@ pub async fn open_php_terminal(version: String) -> Result<String, String> {
     ];
     for (name, prefix) in terminals {
         let Some(binary) = find_in_path(name) else { continue };
-        let spawned = Command::new(binary)
+        let spawned = crate::utils::process::host_command(binary)
             .args(*prefix)
             .args(["env".to_string(), format!("PATH={path}"), format!("PHPRC={}", user_config_dir().display()), "PHP_INI_SCAN_DIR=".to_string(), shell.clone()])
             .current_dir(crate::utils::paths::user_www_dir())
@@ -896,7 +895,7 @@ fn parse_ext_line(line: &str) -> Option<(&'static str, String, bool)> {
 /// Extensions compiled into the binary (`php -n -m`), lowercase.
 fn builtin_modules(dir: &Path) -> Vec<String> {
     let exe = if is_exec(&dir.join("php")) { dir.join("php") } else { return Vec::new() };
-    Command::new(exe).args(["-n", "-m"]).output().ok()
+    crate::utils::process::host_command(exe).args(["-n", "-m"]).output().ok()
         .map(|o| String::from_utf8_lossy(&o.stdout).lines().map(|l| l.trim().to_lowercase()).filter(|l| !l.is_empty() && !l.starts_with('[')).collect())
         .unwrap_or_default()
 }

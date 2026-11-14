@@ -330,7 +330,7 @@ pub fn is_mariadb(mysqld: &Path) -> bool {
     {
         return true;
     }
-    std::process::Command::new(mysqld)
+    crate::utils::process::host_command(mysqld)
         .arg("--version")
         .output()
         .map(|o| String::from_utf8_lossy(&o.stdout).to_lowercase().contains("mariadb"))

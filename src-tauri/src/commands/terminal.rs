@@ -121,6 +121,12 @@ fn linux_shell(shell: &str) -> Option<CommandBuilder> {
     };
     let mut command = CommandBuilder::new(executable);
     command.env("TERM", "xterm-256color");
+    for (key, value) in crate::utils::process::host_env_overrides() {
+        match value {
+            Some(v) => command.env(key, v),
+            None => command.env_remove(key),
+        }
+    }
     Some(command)
 }
 

@@ -10,10 +10,47 @@ pub fn is_32bit_executable(_path: &Path) -> Result<bool, String> {
     Ok(false)
 }
 
-/// Creates a plain `Command`. (The name is a leftover from the Windows port,
-/// where it suppressed console windows.)
+/// Environment variable overrides for child processes started from inside an
+/// AppImage. The AppImage runtime points LD_LIBRARY_PATH at its bundled
+/// (Ubuntu) libraries; host programs such as php-cgi, httpd or mariadbd would
+/// load those instead of their own and fail to start. LD_PRELOAD is likewise
+/// only meant for our own process (see main.rs).
+/// Returns `(name, Some(value))` to set and `(name, None)` to remove.
+pub fn host_env_overrides() -> Vec<(&'static str, Option<String>)> {
+    let mut out = Vec::new();
+    let appdir = std::env::var("APPDIR").ok().filter(|d| !d.is_empty());
+    if let (Some(appdir), Ok(ld)) = (appdir.as_deref(), std::env::var("LD_LIBRARY_PATH")) {
+        let kept: Vec<&str> = ld
+            .split(':')
+            .filter(|p| !p.is_empty() && !p.starts_with(appdir))
+            .collect();
+        out.push((
+            "LD_LIBRARY_PATH",
+            if kept.is_empty() { None } else { Some(kept.join(":")) },
+        ));
+    }
+    if std::env::var_os("LINUXDEVSTACKBOX_REEXEC").is_some() {
+        out.push(("LD_PRELOAD", None));
+    }
+    out
+}
+
+/// A `Command` for running *host* programs: same as `Command::new`, but with
+/// the AppImage library environment removed (see `host_env_overrides`).
+pub fn host_command<S: AsRef<std::ffi::OsStr>>(program: S) -> Command {
+    let mut cmd = Command::new(program);
+    for (key, value) in host_env_overrides() {
+        match value {
+            Some(v) => cmd.env(key, v),
+            None => cmd.env_remove(key),
+        };
+    }
+    cmd
+}
+
+/// Kept for existing callers (the name is a leftover from the Windows port).
 pub fn create_hidden_command(program: &str) -> Command {
-    Command::new(program)
+    host_command(program)
 }
 
 struct ProcEntry {
