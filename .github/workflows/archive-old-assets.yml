@@ -1,0 +1,37 @@
+name: Archive old assets (one-off)
+
+# One-off cleanup: moves the stale 0.1.22 files out of the v0.2.0 release into
+# their own v0.1.22 release/tag, so every version has a separate release.
+# Run manually once from the Actions tab, then this file can be deleted.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  archive:
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      GH_REPO: ${{ github.repository }}
+    steps:
+      - name: Move 0.1.22 assets to their own release
+        run: |
+          set -euo pipefail
+          mkdir old && cd old
+          gh release download v0.2.0 --pattern '*0.1.22*' || true
+          rm -f ./*.sha256   # stale checksum of an earlier build
+          if ! ls ./* >/dev/null 2>&1; then echo "Nothing to archive"; exit 0; fi
+          sha256sum * > SHA256SUMS.txt
+          if ! gh release view v0.1.22 >/dev/null 2>&1; then
+            gh release create v0.1.22 ./* \
+              --target 632d59587a938db2b37229b96038b547dc668631 \
+              --title "LinuxDevStackBox v0.1.22" --latest=false \
+              --notes "Archived earlier build (AppImage, .deb, .rpm, Arch package). Superseded by the latest release; kept for reference."
+          fi
+          gh release view v0.1.22 >/dev/null   # only delete once the archive exists
+          for a in $(gh release view v0.2.0 --json assets --jq '.assets[].name' | grep 0.1.22); do
+            gh release delete-asset v0.2.0 "$a" -y
+          done
+          gh release edit v0.2.0 --latest --notes "Packages: AppImage (any distro), .deb (Debian/Ubuntu), .rpm (Fedora/openSUSE), .pkg.tar.zst (Arch). Requires Apache, MariaDB/MySQL and php-cgi (installed automatically by the native packages). See README. Older versions: see the other releases."

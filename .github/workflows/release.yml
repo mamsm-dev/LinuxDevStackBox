@@ -116,12 +116,19 @@ jobs:
           TAG: ${{ github.event.inputs.tag || github.ref_name }}
         run: |
           set -euo pipefail
+          # One release per version: every tag keeps its own release and its own
+          # files, so older versions stay available under their own tags.
           if gh release view "$TAG" >/dev/null 2>&1; then
+            # Re-run of the same tag: drop stale assets, then upload fresh ones.
+            ls artifacts > /tmp/new_assets.txt
+            gh release view "$TAG" --json assets --jq '.assets[].name' | while read -r a; do
+              grep -qxF "$a" /tmp/new_assets.txt || gh release delete-asset "$TAG" "$a" -y
+            done
             gh release upload "$TAG" artifacts/* --clobber
           else
             gh release create "$TAG" artifacts/* \
               --target "${{ github.sha }}" \
               --title "LinuxDevStackBox $TAG" \
-              --generate-notes \
+              --latest \
               --notes "Packages: AppImage (any distro), .deb (Debian/Ubuntu), .rpm (Fedora/openSUSE), .pkg.tar.zst (Arch). Requires Apache, MariaDB/MySQL and php-cgi (installed automatically by the native packages). See README."
           fi
