@@ -4,7 +4,12 @@ All notable changes to LinuxDevStackBox (a Linux port of DevStackBox) are docume
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
-## [Unreleased]
+## [0.2.0]
+
+### Added
+
+- Update check against GitHub Releases at startup (and every 6 hours). When a newer release exists the user is notified and asked whether to update; AppImage installs are replaced in place and deb/rpm/pacman installs are updated through `pkexec`. Downloads are verified against `SHA256SUMS.txt`.
+- Release packages: AppImage, `.deb`, `.rpm` and an Arch Linux package.
 
 ### Changed
 

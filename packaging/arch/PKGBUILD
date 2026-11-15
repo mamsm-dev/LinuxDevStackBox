@@ -3,7 +3,7 @@
 # Build first:  npx tauri build --no-bundle --ci
 # Then:         cd packaging/arch && makepkg -f
 pkgname=linuxdevstackbox
-pkgver=${LDSB_VERSION:-0.1.22}
+pkgver=${LDSB_VERSION:-0.2.0}
 pkgrel=1
 pkgdesc='Local PHP development environment (Apache, MariaDB, phpMyAdmin, PHP) - Linux port of DevStackBox'
 arch=('x86_64')

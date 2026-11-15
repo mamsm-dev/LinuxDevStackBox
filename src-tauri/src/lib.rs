@@ -11,7 +11,7 @@ pub mod utils;
 
 use tauri::{Emitter, Manager};
 
-use crate::commands::app_update::{check_app_update, get_updater_endpoint};
+use crate::commands::app_update::{check_app_update, download_and_install_update, get_updater_endpoint};
 use crate::commands::apache::{get_apache_status, start_apache, stop_apache, toggle_apache};
 use crate::commands::config::{
     backup_config, list_config_backups, read_config, restore_config_backup, update_config,
@@ -146,6 +146,7 @@ pub fn run() {
             list_www_projects,
             export_diagnostics_bundle,
             get_updater_endpoint,
+            download_and_install_update,
             check_app_update,
             show_main_window,
             hide_to_tray,

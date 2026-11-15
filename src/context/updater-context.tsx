@@ -182,8 +182,7 @@ export function UpdaterProvider({ children }: { children: ReactNode }) {
             downloadAndInstall: async (onEvent) => {
               const channel = new Channel();
               channel.onmessage = (msg) => onEvent(msg);
-              await invoke("plugin:updater|download_and_install", {
-                rid: meta.rid,
+              await invoke("download_and_install_update", {
                 onEvent: channel,
               });
             },
@@ -333,10 +332,13 @@ export function UpdaterProvider({ children }: { children: ReactNode }) {
       throw lastError;
     } catch (err) {
       console.error("[UpdaterContext] downloadAndInstall failed:", err);
+      // The backend rejects with a readable string (checksum, auth cancelled, ...).
       const message =
         err instanceof Error && err.message.includes("Services could not")
           ? err.message
-          : t("updater.downloadFailed", "Failed to download update");
+          : typeof err === "string" && err.length > 0
+            ? err
+            : t("updater.downloadFailed", "Failed to download update");
       setCheckError(message);
       setDownloading(false);
       setReadyToInstall(false);
