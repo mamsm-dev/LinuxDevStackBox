@@ -1,0 +1,177 @@
+<!doctype html>
+<html lang="en" dir="ltr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>LinuxDevStackBox - Local PHP development environment for Linux</title>
+  <meta name="description" content="Apache, MariaDB/MySQL, phpMyAdmin and PHP in one desktop app for Linux. AppImage, deb, rpm and Arch packages.">
+  <meta property="og:title" content="LinuxDevStackBox">
+  <meta property="og:description" content="A free XAMPP alternative for Linux: Apache, MariaDB/MySQL, phpMyAdmin and PHP in one app.">
+  <meta property="og:image" content="assets/icon.png">
+  <link rel="icon" href="assets/favicon.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Vazirmatn:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<header class="nav">
+  <div class="wrap nav-in">
+    <a class="brand" href="#top"><img src="assets/icon.png" alt="" width="32" height="32"><span>LinuxDevStackBox</span></a>
+    <nav class="links">
+      <a href="#features" data-i18n="nav.features">Features</a>
+      <a href="#install" data-i18n="nav.install">Install</a>
+      <a href="#download" data-i18n="nav.download">Download</a>
+      <a href="#faq" data-i18n="nav.faq">FAQ</a>
+    </nav>
+    <div class="nav-actions">
+      <button class="btn ghost sm" id="lang" type="button" aria-label="Language">فارسی</button>
+      <a class="btn ghost sm" href="https://github.com/mamsm-dev/LinuxDevStackBox" target="_blank" rel="noopener">GitHub</a>
+    </div>
+  </div>
+</header>
+
+<main id="top">
+  <section class="hero">
+    <div class="wrap hero-in">
+      <div class="hero-text">
+        <span class="pill" data-i18n="hero.pill">Free · Open source · MIT</span>
+        <h1 data-i18n="hero.title">Your local PHP stack, <em>made for Linux</em></h1>
+        <p class="lead" data-i18n="hero.lead">Apache, MariaDB/MySQL, phpMyAdmin and PHP in one desktop app. Start your services with a click, manage projects and virtual hosts, and forget about editing config files.</p>
+        <div class="cta">
+          <a class="btn primary lg" href="#download" id="hero-dl"><span data-i18n="hero.download">Download</span> <small id="hero-ver"></small></a>
+          <a class="btn ghost lg" href="#install" data-i18n="hero.how">How to install</a>
+        </div>
+        <p class="muted small" data-i18n="hero.note">AppImage · .deb · .rpm · Arch package · x86_64</p>
+      </div>
+
+      <div class="mock" aria-hidden="true">
+        <div class="mock-bar"><i></i><i></i><i></i><span>LinuxDevStackBox</span></div>
+        <div class="mock-body">
+          <aside>
+            <b class="on">Dashboard</b><b>Services</b><b>Projects</b><b>Databases</b><b>Logs</b><b>Terminal</b><b>Settings</b>
+          </aside>
+          <div class="mock-main">
+            <div class="mock-head"><strong>Dashboard</strong><span class="tag ok">2/2 services active</span><span class="tag">PHP 8.5</span></div>
+            <div class="cards">
+              <div class="card-s"><h4>Apache <span class="tag ok">Running</span></h4><p>Port <code>8080</code></p><p>Version <code>2.4.69</code></p></div>
+              <div class="card-s"><h4>MySQL <span class="tag ok">Running</span></h4><p>Port <code>3306</code></p><p>Version <code>MariaDB 13</code></p></div>
+              <div class="card-s"><h4>PHP <span class="tag blue">Ready 8.5</span></h4><p>Version <code>8.5.12</code></p><p>CGI <code>php-cgi</code></p></div>
+            </div>
+            <div class="log"><span>[mpm_event:notice] AH00489: Apache/2.4.69 configured</span><span>[core:notice] AH00094: Command line: httpd -f config/httpd.conf</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="stack">
+    <div class="wrap">
+      <ul class="chips">
+        <li>Apache 2.4</li><li>MariaDB / MySQL</li><li>phpMyAdmin</li><li>PHP 8.2 – 8.5</li><li>Local HTTPS</li><li>.test domains</li>
+      </ul>
+    </div>
+  </section>
+
+  <section id="features" class="section">
+    <div class="wrap">
+      <h2 data-i18n="f.title">Everything you need to build PHP sites</h2>
+      <p class="sub" data-i18n="f.sub">A lightweight alternative to XAMPP/LAMPP, with a modern interface and none of the manual setup.</p>
+      <div class="grid">
+        <article class="feat"><div class="ic">⚡</div><h3 data-i18n="f1.t">One-click services</h3><p data-i18n="f1.d">Start, stop and monitor Apache, MariaDB/MySQL and PHP from one window or from the system tray.</p></article>
+        <article class="feat"><div class="ic">🐘</div><h3 data-i18n="f2.t">Multiple PHP versions</h3><p data-i18n="f2.d">Detects every PHP 8.2–8.5 installed on your system and lets you pick a version per project.</p></article>
+        <article class="feat"><div class="ic">🌐</div><h3 data-i18n="f3.t">Projects & virtual hosts</h3><p data-i18n="f3.d">Point a folder at a <code>.test</code> domain in seconds. Hosts entries are managed for you through polkit.</p></article>
+        <article class="feat"><div class="ic">🔒</div><h3 data-i18n="f4.t">Local HTTPS</h3><p data-i18n="f4.d">Generates a local certificate authority and trusts it in your system and browsers.</p></article>
+        <article class="feat"><div class="ic">🗄️</div><h3 data-i18n="f5.t">Database tools</h3><p data-i18n="f5.d">Create, import, export and back up databases and users, with phpMyAdmin built in.</p></article>
+        <article class="feat"><div class="ic">🛠️</div><h3 data-i18n="f6.t">Configs, logs, terminal</h3><p data-i18n="f6.d">Edit configuration with backups, read logs live and open a terminal with PHP ready in PATH.</p></article>
+        <article class="feat"><div class="ic">📥</div><h3 data-i18n="f7.t">Import from XAMPP</h3><p data-i18n="f7.d">Bring your existing <code>/opt/lampp</code> projects over without starting from scratch.</p></article>
+        <article class="feat"><div class="ic">🔄</div><h3 data-i18n="f8.t">Built-in updates</h3><p data-i18n="f8.d">Checks GitHub for new releases and offers to update, verifying every download with a checksum.</p></article>
+        <article class="feat"><div class="ic">🕶️</div><h3 data-i18n="f9.t">No telemetry</h3><p data-i18n="f9.d">Everything stays on your machine. Open source under the MIT license, in English and Persian (RTL).</p></article>
+      </div>
+    </div>
+  </section>
+
+  <section id="install" class="section alt">
+    <div class="wrap">
+      <h2 data-i18n="i.title">Install</h2>
+      <p class="sub" data-i18n="i.sub">Pick your distribution. Native packages install Apache, MariaDB and PHP automatically.</p>
+      <div class="tabs" role="tablist">
+        <button role="tab" data-tab="deb" class="on">Debian / Ubuntu</button>
+        <button role="tab" data-tab="arch">Arch</button>
+        <button role="tab" data-tab="rpm">Fedora</button>
+        <button role="tab" data-tab="appimage">AppImage</button>
+      </div>
+
+      <div class="panel on" data-panel="deb">
+        <ol>
+          <li><span data-i18n="i.dl">Download the package from the latest release</span> (<code>.deb</code>)</li>
+          <li><span data-i18n="i.run">Install it</span></li>
+        </ol>
+        <div class="code"><code>sudo apt install ./LinuxDevStackBox_*.deb</code><button class="copy" data-i18n="copy">Copy</button></div>
+      </div>
+      <div class="panel" data-panel="arch">
+        <ol>
+          <li><span data-i18n="i.dl">Download the package from the latest release</span> (<code>.pkg.tar.zst</code>)</li>
+          <li><span data-i18n="i.run">Install it</span></li>
+        </ol>
+        <div class="code"><code>sudo pacman -U linuxdevstackbox-*.pkg.tar.zst</code><button class="copy" data-i18n="copy">Copy</button></div>
+      </div>
+      <div class="panel" data-panel="rpm">
+        <ol>
+          <li><span data-i18n="i.dl">Download the package from the latest release</span> (<code>.rpm</code>)</li>
+          <li><span data-i18n="i.run">Install it</span></li>
+        </ol>
+        <div class="code"><code>sudo dnf install ./LinuxDevStackBox-*.rpm</code><button class="copy" data-i18n="copy">Copy</button></div>
+      </div>
+      <div class="panel" data-panel="appimage">
+        <ol>
+          <li><span data-i18n="i.ai1">Install the services the AppImage does not bundle</span>: Apache, MariaDB/MySQL, <code>php-cgi</code></li>
+          <li><span data-i18n="i.ai2">Make it executable and run it</span></li>
+        </ol>
+        <div class="code"><code>sudo apt install apache2 mariadb-server php-cgi php-cli php-mysql   # Debian/Ubuntu<br>sudo pacman -S apache mariadb php php-cgi                       # Arch</code><button class="copy" data-i18n="copy">Copy</button></div>
+        <div class="code"><code>chmod +x LinuxDevStackBox_*.AppImage &amp;&amp; ./LinuxDevStackBox_*.AppImage</code><button class="copy" data-i18n="copy">Copy</button></div>
+        <p class="muted small" data-i18n="i.ai3">If the AppImage does not start, install FUSE (<code>libfuse2</code>). A blank window? Run it with <code>WEBKIT_DISABLE_DMABUF_RENDERER=1</code>.</p>
+      </div>
+      <p class="muted small" data-i18n="i.after">After installing, open LinuxDevStackBox, start Apache and MySQL, then visit <code>http://localhost:8080/</code> and <code>http://localhost:8080/phpmyadmin/</code>.</p>
+    </div>
+  </section>
+
+  <section id="download" class="section">
+    <div class="wrap">
+      <h2 data-i18n="d.title">Download</h2>
+      <p class="sub"><span data-i18n="d.latest">Latest release</span>: <strong id="rel-name">…</strong></p>
+      <div class="dl-grid" id="dl-grid">
+        <div class="dl skeleton"></div><div class="dl skeleton"></div><div class="dl skeleton"></div><div class="dl skeleton"></div>
+      </div>
+      <p class="center"><a class="btn ghost" id="all-rel" href="https://github.com/mamsm-dev/LinuxDevStackBox/releases" target="_blank" rel="noopener" data-i18n="d.all">All releases on GitHub</a></p>
+    </div>
+  </section>
+
+  <section id="faq" class="section alt">
+    <div class="wrap narrow">
+      <h2 data-i18n="q.title">FAQ</h2>
+      <details><summary data-i18n="q1.q">Why does Apache run on port 8080?</summary><p data-i18n="q1.a">Linux does not let normal users open ports below 1024. LinuxDevStackBox uses 8080 (HTTPS 8443) unless your system allows low ports: <code>sudo sysctl net.ipv4.ip_unprivileged_port_start=80</code>.</p></details>
+      <details><summary data-i18n="q2.q">Where are my projects and data?</summary><p data-i18n="q2.a">Projects live in <code>~/LinuxDevStackBox/www</code>. Configuration, logs and databases are in <code>~/.local/share/linuxdevstackbox</code>.</p></details>
+      <details><summary data-i18n="q3.q">How do I add another PHP version?</summary><p data-i18n="q3.a">Install it with your package manager (for example <code>php8.4-cgi</code> from the Ondřej PPA). LinuxDevStackBox detects it automatically.</p></details>
+      <details><summary data-i18n="q4.q">Will it conflict with the Apache/MariaDB services of my distribution?</summary><p data-i18n="q4.a">The app runs its own instances. If MariaDB from systemd already uses port 3306, stop it with <code>sudo systemctl disable --now mariadb</code>.</p></details>
+      <details><summary data-i18n="q5.q">What is the relation to DevStackBox?</summary><p data-i18n="q5.a">LinuxDevStackBox is a Linux port of the Windows project <a href="https://github.com/DevStackBox/DevStackBox" target="_blank" rel="noopener">DevStackBox</a> by Nomad Programmer, maintained by mamsm-dev.</p></details>
+    </div>
+  </section>
+</main>
+
+<footer class="foot">
+  <div class="wrap foot-in">
+    <div><img src="assets/icon.png" alt="" width="24" height="24"> <strong>LinuxDevStackBox</strong> <span class="muted" id="foot-ver"></span></div>
+    <div class="foot-links">
+      <a href="https://github.com/mamsm-dev/LinuxDevStackBox" target="_blank" rel="noopener">GitHub</a>
+      <a href="https://github.com/mamsm-dev/LinuxDevStackBox/issues" target="_blank" rel="noopener">Issues</a>
+      <a href="https://github.com/mamsm-dev/LinuxDevStackBox/blob/main/LICENSE" target="_blank" rel="noopener" data-i18n="foot.license">MIT License</a>
+    </div>
+    <p class="muted small" data-i18n="foot.credit">A Linux port of DevStackBox. © 2026 DevStackBox and mamsm-dev.</p>
+  </div>
+</footer>
+
+<script src="script.js"></script>
+</body>
+</html>
