@@ -5,14 +5,14 @@
 [English](README.md) · [فارسی](README.fa.md)
 
 ![License: MIT](https://img.shields.io/github/license/mamsm-dev/LinuxDevStackBox?style=flat-square)
-![Linux](https://img.shields.io/badge/Linux-AppImage-FCC624?style=flat-square&logo=linux&logoColor=black)
+![Linux](https://img.shields.io/badge/Linux-AppImage%20%7C%20deb%20%7C%20rpm%20%7C%20Arch-FCC624?style=flat-square&logo=linux&logoColor=black)
 ![Release](https://img.shields.io/github/v/release/mamsm-dev/LinuxDevStackBox?style=flat-square)
 
-**محیط توسعه محلی PHP برای لینوکس.** Apache، MySQL/MariaDB، phpMyAdmin و PHP در یک برنامه دسکتاپ که به‌صورت یک فایل AppImage ارائه می‌شود. جایگزینی رایگان و مدرن برای XAMPP/LAMPP.
+**محیط توسعه محلی PHP برای لینوکس.** Apache، MySQL/MariaDB، phpMyAdmin و PHP در یک برنامه دسکتاپ که به‌صورت AppImage، `.deb`، `.rpm` و بسته Arch ارائه می‌شود. جایگزینی رایگان و مدرن برای XAMPP/LAMPP.
 
 LinuxDevStackBox نسخه لینوکسی پروژه [DevStackBox](https://github.com/DevStackBox/DevStackBox) است (که در اصل برای ویندوز نوشته شده بود؛ سازنده: Nomad Programmer) و توسط [mamsm-dev](https://github.com/mamsm-dev) نگهداری می‌شود. با Tauri (Rust) و React ساخته شده است.
 
-> **وضعیت:** پورت اولیه. برنامه ساخته می‌شود و AppImage اجرا می‌شود، ولی روی سیستم‌های واقعی کم تست شده است. مشکلات را در [Issues](https://github.com/mamsm-dev/LinuxDevStackBox/issues) گزارش کنید.
+> **وضعیت:** پورت اولیه. برنامه روی Arch Linux اجرا می‌شود و سرویس‌ها کار می‌کنند؛ بسته‌های `.deb` و `.rpm` و فرایند به‌روزرسانی روی سیستم‌های واقعی کم تست شده‌اند. مشکلات را در [Issues](https://github.com/mamsm-dev/LinuxDevStackBox/issues) گزارش کنید.
 
 ## امکانات
 
@@ -48,6 +48,10 @@ LinuxDevStackBox نسخه لینوکسی پروژه [DevStackBox](https://github
 
 نکات AppImage: اگر اجرا نشد، FUSE را نصب کنید (`sudo apt install libfuse2`). اگر پنجره خالی (سیاه) بود، با `WEBKIT_DISABLE_DMABUF_RENDERER=1` اجرا کنید.
 
+## به‌روزرسانی
+
+هنگام اجرا، برنامه [آخرین ریلیز گیت‌هاب](https://github.com/mamsm-dev/LinuxDevStackBox/releases/latest) را بررسی می‌کند. اگر نسخه جدیدتری باشد اطلاع می‌دهد و می‌پرسد که به‌روزرسانی کند یا نه. در بسته‌های بومی (`.deb`، `.rpm`، Arch) فایل دانلود، با `SHA256SUMS.txt` بررسی و با `pkexec` نصب می‌شود؛ AppImage خودش را جایگزین می‌کند. می‌توانید رد کنید و به کارتان ادامه دهید. تنها درخواست برنامه، به API عمومی گیت‌هاب است.
+
 ## استفاده
 
 - Apache و MySQL را از داشبورد روشن کنید، سپس `http://localhost:8080/` و `http://localhost:8080/phpmyadmin/` را باز کنید. پورت واقعی در خود برنامه نمایش داده می‌شود.
@@ -63,7 +67,8 @@ LinuxDevStackBox نسخه لینوکسی پروژه [DevStackBox](https://github
 ```bash
 bash scripts/install-deps.sh build   # وابستگی‌های بیلد Tauri + پکیج‌های اجرا
 npm ci
-bash scripts/build-appimage.sh       # خروجی: src-tauri/target/release/bundle/appimage/
+bash scripts/build-appimage.sh       # AppImage: src-tauri/target/release/bundle/appimage/
+BUNDLES=appimage,deb,rpm node scripts/build-release.mjs   # همه بسته‌ها
 ```
 
 <div dir="rtl">
@@ -72,7 +77,11 @@ bash scripts/build-appimage.sh       # خروجی: src-tauri/target/release/bund
 
 ## ریلیزها
 
-ریلیزها با GitHub Actions ساخته می‌شوند. یک تگ مثل `v0.2.0` را push کنید یا workflow به نام **Release packages** را دستی اجرا کنید؛ فایل‌های AppImage، `.deb`، `.rpm`، بسته Arch و `SHA256SUMS.txt` به ریلیز اضافه می‌شوند.
+ریلیزها با GitHub Actions ساخته می‌شوند. یک تگ مثل `v0.2.0` را push کنید یا workflow به نام **Release packages** را دستی اجرا کنید؛ فایل‌های AppImage، `.deb`، `.rpm`، بسته Arch و `SHA256SUMS.txt` به ریلیز اضافه می‌شوند. هر نسخه ریلیز و تگ جداگانه دارد و نسخه‌های قبلی در [Releases](https://github.com/mamsm-dev/LinuxDevStackBox/releases) می‌مانند؛ اجرای دوباره‌ی یک تگ فقط فایل‌های همان ریلیز را جایگزین می‌کند.
+
+## سایت
+
+صفحه معرفی محصول روی شاخه `gh-pages` است (HTML/CSS/JS ساده، فارسی و انگلیسی، ریسپانسیو). برای فعال‌سازی: **Settings → Pages → Deploy from a branch → `gh-pages` / root**.
 
 ## مشارکت
 

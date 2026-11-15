@@ -3,14 +3,14 @@
 [English](README.md) · [فارسی](README.fa.md)
 
 ![License: MIT](https://img.shields.io/github/license/mamsm-dev/LinuxDevStackBox?style=flat-square)
-![Linux](https://img.shields.io/badge/Linux-AppImage-FCC624?style=flat-square&logo=linux&logoColor=black)
+![Linux](https://img.shields.io/badge/Linux-AppImage%20%7C%20deb%20%7C%20rpm%20%7C%20Arch-FCC624?style=flat-square&logo=linux&logoColor=black)
 ![Release](https://img.shields.io/github/v/release/mamsm-dev/LinuxDevStackBox?style=flat-square)
 
-**A local PHP development environment for Linux.** Apache, MySQL/MariaDB, phpMyAdmin and PHP, managed from one desktop app and distributed as a single AppImage. A free alternative to XAMPP/LAMPP with a modern UI.
+**A local PHP development environment for Linux.** Apache, MySQL/MariaDB, phpMyAdmin and PHP, managed from one desktop app and distributed as an AppImage, `.deb`, `.rpm` and Arch package. A free alternative to XAMPP/LAMPP with a modern UI.
 
 LinuxDevStackBox is a Linux port of [DevStackBox](https://github.com/DevStackBox/DevStackBox) (originally for Windows) by Nomad Programmer, maintained by [mamsm-dev](https://github.com/mamsm-dev). It is built with Tauri (Rust) and React.
 
-> **Status:** early port. It builds and the AppImage starts, but it has had limited testing on real systems. Please report problems in [Issues](https://github.com/mamsm-dev/LinuxDevStackBox/issues).
+> **Status:** early port. The app runs and its services work on Arch Linux; the `.deb`, `.rpm` and update flow have had limited testing on real systems. Please report problems in [Issues](https://github.com/mamsm-dev/LinuxDevStackBox/issues).
 
 ## Features
 
@@ -46,6 +46,10 @@ Or run `bash scripts/install-deps.sh`, which also disables the distribution's ow
 
 AppImage notes: if it does not start, install FUSE (`sudo apt install libfuse2`). If the window is blank, start it with `WEBKIT_DISABLE_DMABUF_RENDERER=1`.
 
+## Updates
+
+On startup the app checks the [latest GitHub release](https://github.com/mamsm-dev/LinuxDevStackBox/releases/latest). If a newer version exists it tells you and asks whether to update. With a native package (`.deb`, `.rpm`, Arch) the update is downloaded, verified against `SHA256SUMS.txt` and installed through `pkexec`; an AppImage replaces itself. You can decline and keep working. The only request the app makes is to the public GitHub API.
+
 ## Usage
 
 - Start Apache and MySQL from the dashboard, then open `http://localhost:8080/` and `http://localhost:8080/phpmyadmin/`. The app shows the actual port.
@@ -59,14 +63,19 @@ AppImage notes: if it does not start, install FUSE (`sudo apt install libfuse2`)
 ```bash
 bash scripts/install-deps.sh build   # Tauri build dependencies + runtime packages
 npm ci
-bash scripts/build-appimage.sh       # output: src-tauri/target/release/bundle/appimage/
+bash scripts/build-appimage.sh       # AppImage: src-tauri/target/release/bundle/appimage/
+BUNDLES=appimage,deb,rpm node scripts/build-release.mjs   # all bundles
 ```
 
 For development use `npm run tauri:dev`. Requires Rust, Node.js 18+, webkit2gtk-4.1, libayatana-appindicator and librsvg2.
 
 ## Releases
 
-Releases are built by GitHub Actions. Push a tag such as `v0.2.0`, or run the **Release packages** workflow manually, and the AppImage, `.deb`, `.rpm`, Arch package and `SHA256SUMS.txt` are attached to the release.
+Releases are built by GitHub Actions. Push a tag such as `v0.2.0`, or run the **Release packages** workflow manually, and the AppImage, `.deb`, `.rpm`, Arch package and `SHA256SUMS.txt` are attached to the release. Each version has its own release and tag, so older versions stay available in [Releases](https://github.com/mamsm-dev/LinuxDevStackBox/releases); re-running a tag replaces only that release's files.
+
+## Website
+
+The product page lives on the `gh-pages` branch (plain HTML/CSS/JS, English and Persian, responsive). Enable it under **Settings → Pages → Deploy from a branch → `gh-pages` / root**.
 
 ## Contributing
 
