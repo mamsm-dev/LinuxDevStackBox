@@ -132,3 +132,14 @@
   const preferred = saved || ((navigator.language || "").toLowerCase().startsWith("fa") ? "fa" : "en");
   if (preferred === "fa") applyLang("fa");
 })();
+
+// mobile menu
+(function(){
+  var b=document.getElementById('menu'),h=document.querySelector('.nav');
+  if(!b||!h)return;
+  function set(o){h.classList.toggle('menu-open',o);b.setAttribute('aria-expanded',o)}
+  b.addEventListener('click',function(){set(!h.classList.contains('menu-open'))});
+  document.querySelectorAll('.links a').forEach(function(a){a.addEventListener('click',function(){set(false)})});
+  document.addEventListener('keydown',function(e){if(e.key==='Escape')set(false)});
+  window.matchMedia('(min-width:901px)').addEventListener('change',function(){set(false)});
+})();
