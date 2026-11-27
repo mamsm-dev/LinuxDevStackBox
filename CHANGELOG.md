@@ -4,6 +4,13 @@ All notable changes to LinuxDevStackBox (a Linux port of DevStackBox) are docume
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.2.1]
+
+### Fixed
+
+- Installed packages (Arch, `.deb`, `.rpm`) shipped the bundled phpMyAdmin directory with mode 0700 (root only), so phpMyAdmin could not be opened by a normal user until permissions were changed by hand. Resource directories are now installed as 755 and files as 644.
+- The per-user phpMyAdmin copy is always created user-writable, even when the source files are read-only.
+
 ## [0.2.0]
 
 ### Added

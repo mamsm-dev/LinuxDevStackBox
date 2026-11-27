@@ -1,4 +1,5 @@
 use crate::utils::paths::{get_installation_path, get_user_data_root, to_apache_path};
+use std::os::unix::fs::PermissionsExt;
 use std::path::{Path, PathBuf};
 
 const PHPMYADMIN_CONFIG_INC: &str =
@@ -25,9 +26,16 @@ fn copy_tree(from: &Path, to: &Path) -> std::io::Result<()> {
             let _ = std::fs::remove_file(&target);
             std::os::unix::fs::symlink(std::fs::read_link(entry.path())?, &target)?;
         } else {
+            // The copy lives in the user's home and is edited by the app, so it must be
+            // user-writable even if the source is read-only or root-only.
+            if target.exists() {
+                let _ = std::fs::remove_file(&target);
+            }
             std::fs::copy(entry.path(), &target)?;
+            std::fs::set_permissions(&target, std::fs::Permissions::from_mode(0o644))?;
         }
     }
+    std::fs::set_permissions(to, std::fs::Permissions::from_mode(0o755))?;
     Ok(())
 }
 

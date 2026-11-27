@@ -3,7 +3,7 @@
 # Build first:  npx tauri build --no-bundle --ci
 # Then:         cd packaging/arch && makepkg -f
 pkgname=linuxdevstackbox
-pkgver=${LDSB_VERSION:-0.2.0}
+pkgver=${LDSB_VERSION:-0.2.1}
 pkgrel=1
 pkgdesc='Local PHP development environment (Apache, MariaDB, phpMyAdmin, PHP) - Linux port of DevStackBox'
 arch=('x86_64')
@@ -22,6 +22,9 @@ package() {
   install -d "$pkgdir/usr/lib/LinuxDevStackBox"
   cp -r "$root/packaging/phpmyadmin-runtime" "$pkgdir/usr/lib/LinuxDevStackBox/phpmyadmin"
   cp -r "$root/www" "$pkgdir/usr/lib/LinuxDevStackBox/www"
+  # Resources must be readable by every user (not root-only).
+  find "$pkgdir/usr/lib/LinuxDevStackBox" -type d -exec chmod 755 {} +
+  find "$pkgdir/usr/lib/LinuxDevStackBox" -type f -exec chmod 644 {} +
 
   install -Dm644 "$startdir/linuxdevstackbox.desktop" "$pkgdir/usr/share/applications/linuxdevstackbox.desktop"
   install -Dm644 "$root/src-tauri/icons/128x128.png" "$pkgdir/usr/share/icons/hicolor/128x128/apps/linuxdevstackbox.png"

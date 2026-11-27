@@ -33,6 +33,14 @@ export function verifyStage(directory) {
   const config = fs.readFileSync(path.join(directory, "config.inc.php"), "utf8");
   if (!config.includes("$cfg['ThemeDefault'] = 'pmahomme';") || !config.includes("$cfg['ThemeManager'] = false;")) throw new Error("Single-theme configuration missing");
 }
+function normalizeModes(directory) {
+  fs.chmodSync(directory, 0o755);
+  for (const entry of fs.readdirSync(directory, { withFileTypes: true })) {
+    const full = path.join(directory, entry.name);
+    if (entry.isDirectory()) normalizeModes(full);
+    else if (entry.isFile()) fs.chmodSync(full, 0o644);
+  }
+}
 export function stagePhpMyAdmin(repo = root) {
   const source = path.join(repo, "phpmyadmin");
   const parent = path.join(repo, "packaging");
@@ -60,6 +68,10 @@ export function stagePhpMyAdmin(repo = root) {
     const themePolicy = fs.readFileSync(path.join(repo, "config/phpmyadmin-theme.inc.php"));
     fs.writeFileSync(path.join(temporary, "devstackbox-theme.inc.php"), themePolicy);
     report.retained.push({ path: "devstackbox-theme.inc.php", bytes: themePolicy.length, sha256: hash(themePolicy), generated: true });
+    // mkdtemp creates the directory as 0700 (owner only). It becomes the packaged
+    // resource directory, so without this the installed copy is unreadable by
+    // normal users. Normalise: directories 755, files 644.
+    normalizeModes(temporary);
     verifyStage(temporary);
     for (const entry of report.retained) if (hash(fs.readFileSync(path.join(temporary, entry.path))) !== entry.sha256) throw new Error(`Copy verification failed: ${entry.path}`);
     const previous = path.join(parent, ".phpmyadmin-previous-" + randomUUID());
