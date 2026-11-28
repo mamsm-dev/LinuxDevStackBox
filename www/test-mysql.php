@@ -6,7 +6,7 @@ header('Content-Type: text/html; charset=UTF-8');
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>MySQL Connection Test - DevStackBox</title>
+    <title>MySQL Connection Test - LinuxDevStackBox</title>
     <style>
         body { 
             font-family: Arial, sans-serif; 
@@ -120,7 +120,7 @@ header('Content-Type: text/html; charset=UTF-8');
                     message VARCHAR(255),
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 )');
-                $pdo->exec("INSERT INTO test_table (message) VALUES ('DevStackBox test successful!')");
+                $pdo->exec("INSERT INTO test_table (message) VALUES ('LinuxDevStackBox test successful!')");
                 
                 $result = $pdo->query('SELECT * FROM test_table ORDER BY id DESC LIMIT 1')->fetch();
                 

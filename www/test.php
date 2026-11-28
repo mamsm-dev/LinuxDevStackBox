@@ -1,12 +1,12 @@
 <?php
-// DevStackBox - Test Page
+// LinuxDevStackBox - Test Page
 ?>
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Test Page - DevStackBox</title>
+    <title>Test Page - LinuxDevStackBox</title>
     <style>
         body { font-family: Arial, sans-serif; margin: 40px; background: #f4f4f4; }
         .container { background: white; padding: 30px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
@@ -21,7 +21,7 @@
     <div class="container">
         <a href="index.php" class="back-link">← Back to Home</a>
         
-        <h1>🧪 DevStackBox Test Page</h1>
+        <h1>🧪 LinuxDevStackBox Test Page</h1>
         
         <div class="test-section success">
             <h3>✅ PHP is working!</h3>
@@ -60,7 +60,7 @@
             <?php
             $test_file = 'test_write.txt';
             if (is_writable('.')) {
-                file_put_contents($test_file, 'DevStackBox test file - ' . date('Y-m-d H:i:s'));
+                file_put_contents($test_file, 'LinuxDevStackBox test file - ' . date('Y-m-d H:i:s'));
                 if (file_exists($test_file)) {
                     echo '<p class="success">✅ File write test successful</p>';
                     unlink($test_file);

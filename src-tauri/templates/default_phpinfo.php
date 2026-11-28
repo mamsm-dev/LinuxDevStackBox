@@ -1,12 +1,12 @@
 <?php
-// DevStackBox - PHP Information Page
+// LinuxDevStackBox - PHP Information Page
 ?>
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>PHP Info - DevStackBox</title>
+    <title>PHP Info - LinuxDevStackBox</title>
     <style>
         body { font-family: Arial, sans-serif; margin: 20px; background: #f4f4f4; }
         .header { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); margin-bottom: 20px; }
@@ -18,7 +18,7 @@
     <div class="header">
         <a href="index.php" class="back-link">Back to Home</a>
         <h1>PHP Configuration Information</h1>
-        <p>Complete PHP configuration for your DevStackBox environment</p>
+        <p>Complete PHP configuration for your LinuxDevStackBox environment</p>
     </div>
 
     <?php

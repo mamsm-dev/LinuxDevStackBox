@@ -1,5 +1,5 @@
 <?php
-// DevStackBox - PHP Development Environment
+// LinuxDevStackBox - PHP Development Environment
 $https = !empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off';
 $port = (int) ($_SERVER['SERVER_PORT'] ?? ($https ? 443 : 80));
 $address = ($https ? 'https' : 'http') . '://localhost' .
@@ -10,7 +10,7 @@ $address = ($https ? 'https' : 'http') . '://localhost' .
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>DevStackBox - PHP Development Environment</title>
+    <title>LinuxDevStackBox - PHP Development Environment</title>
     <style>
         body { font-family: Arial, sans-serif; margin: 40px; background: #f4f4f4; }
         .container { background: white; padding: 30px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
@@ -28,7 +28,7 @@ $address = ($https ? 'https' : 'http') . '://localhost' .
 </head>
 <body>
     <div class="container">
-        <h1>DevStackBox - PHP Development Environment</h1>
+        <h1>LinuxDevStackBox - PHP Development Environment</h1>
         
         <div class="status">
             <strong>PHP is working!</strong><br>
@@ -63,7 +63,7 @@ $address = ($https ? 'https' : 'http') . '://localhost' .
         </div>
 
         <div style="margin-top: 30px; color: #666; border-top: 1px solid #eee; padding-top: 20px;">
-            <small>DevStackBox - Portable PHP Development Environment<br>
+            <small>LinuxDevStackBox - Portable PHP Development Environment<br>
             Current address: <a href="/"><?php echo htmlspecialchars($address, ENT_QUOTES, 'UTF-8'); ?></a></small>
         </div>
     </div>

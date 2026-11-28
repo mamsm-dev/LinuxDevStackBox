@@ -1,12 +1,12 @@
 <?php
-// DevStackBox - PHP Development Environment
+// LinuxDevStackBox - PHP Development Environment
 ?>
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>DevStackBox - PHP Development Environment</title>
+    <title>LinuxDevStackBox - PHP Development Environment</title>
     <style>
         body { font-family: Arial, sans-serif; margin: 40px; background: #f4f4f4; }
         .container { background: white; padding: 30px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
@@ -24,7 +24,7 @@
 </head>
 <body>
     <div class="container">
-        <h1>DevStackBox - PHP Development Environment</h1>
+        <h1>LinuxDevStackBox - PHP Development Environment</h1>
 
         <div class="status">
             <strong>PHP is working!</strong><br>
@@ -59,7 +59,7 @@
         </div>
 
         <div style="margin-top: 30px; color: #666; border-top: 1px solid #eee; padding-top: 20px;">
-            <small>DevStackBox - Portable PHP Development Environment<br>
+            <small>LinuxDevStackBox - Portable PHP Development Environment<br>
             Access this page at: <a href="http://localhost">http://localhost</a></small>
         </div>
     </div>

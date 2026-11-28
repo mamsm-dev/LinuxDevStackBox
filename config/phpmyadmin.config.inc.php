@@ -1,6 +1,6 @@
 <?php
 /**
- * phpMyAdmin Configuration for DevStackBox
+ * phpMyAdmin Configuration for LinuxDevStackBox
  * Copied to phpmyadmin/config.inc.php by the bundle and refresh scripts.
  */
 
@@ -15,7 +15,7 @@ $cfg['Servers'][1]['password'] = '';
 $cfg['Servers'][1]['AllowNoPassword'] = true;
 $cfg['Servers'][1]['AllowRoot'] = true;
 
-// Directories with correct paths for DevStackBox
+// Directories with correct paths for LinuxDevStackBox
 $cfg['UploadDir'] = './upload';
 $cfg['SaveDir'] = './save';
 $cfg['TempDir'] = './tmp';

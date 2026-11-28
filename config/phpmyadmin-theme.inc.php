@@ -1,5 +1,5 @@
 <?php
-// DevStackBox's packaged phpMyAdmin has one supported theme.
+// LinuxDevStackBox's packaged phpMyAdmin has one supported theme.
 $cfg['ThemeDefault'] = 'pmahomme';
 $cfg['ThemeManager'] = false;
 $cfg['ThemePerServer'] = false;

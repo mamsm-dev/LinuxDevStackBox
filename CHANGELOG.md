@@ -8,6 +8,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+- Branding: the default Apache landing page and sample pages, and the phpMyAdmin config, now say LinuxDevStackBox instead of DevStackBox. Existing sites get their default pages renamed once (your own edits are kept), and the About-page GitHub links point to this repository.
+
 - Installed packages (Arch, `.deb`, `.rpm`) shipped the bundled phpMyAdmin directory with mode 0700 (root only), so phpMyAdmin could not be opened by a normal user until permissions were changed by hand. Resource directories are now installed as 755 and files as 644.
 - The per-user phpMyAdmin copy is always created user-writable, even when the source files are read-only.
 

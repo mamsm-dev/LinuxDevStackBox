@@ -3,7 +3,7 @@ export const URLS = {
   docs: "https://www.devstackbox.com/docs",
   download: "https://www.devstackbox.com/download",
   roadmap: "https://www.devstackbox.com/roadmap",
-  githubRepo: "https://github.com/DevStackBox/DevStackBox",
-  githubIssues: "https://github.com/DevStackBox/DevStackBox/issues",
-  githubNewIssue: "https://github.com/DevStackBox/DevStackBox/issues/new",
+  githubRepo: "https://github.com/mamsm-dev/LinuxDevStackBox",
+  githubIssues: "https://github.com/mamsm-dev/LinuxDevStackBox/issues",
+  githubNewIssue: "https://github.com/mamsm-dev/LinuxDevStackBox/issues/new",
 } as const;

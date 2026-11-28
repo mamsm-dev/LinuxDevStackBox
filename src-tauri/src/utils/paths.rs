@@ -115,8 +115,53 @@ pub fn user_www_dir() -> PathBuf {
         if bundled.is_dir() {
             let _ = copy_dir_recursive(&bundled, &p);
         }
+        let _ = std::fs::write(p.join(WWW_BRANDING_MARKER), "");
+    } else {
+        rebrand_default_pages(&p);
     }
     p
+}
+
+const WWW_BRANDING_MARKER: &str = ".ldsb-branding";
+const DEFAULT_PAGES: [&str; 6] =
+    ["index.php", "index.html", "phpinfo.php", "test.php", "test.html", "test-mysql.php"];
+
+/// Replaces a bare "DevStackBox" (not already "LinuxDevStackBox") with the new name.
+pub fn rebrand_text(text: &str) -> String {
+    const OLD: &str = "DevStackBox";
+    let mut out = String::with_capacity(text.len() + 32);
+    let mut rest = text;
+    while let Some(i) = rest.find(OLD) {
+        out.push_str(&rest[..i]);
+        if out.ends_with("Linux") {
+            out.push_str(OLD);
+        } else {
+            out.push_str("LinuxDevStackBox");
+        }
+        rest = &rest[i + OLD.len()..];
+    }
+    out.push_str(rest);
+    out
+}
+
+/// Sites created by version 0.2.0 or earlier were seeded with pages that still
+/// said "DevStackBox". Once per site, fix the name in the default pages only
+/// (user edits to those files are kept, other files are not touched).
+fn rebrand_default_pages(www: &Path) {
+    let marker = www.join(WWW_BRANDING_MARKER);
+    if marker.exists() {
+        return;
+    }
+    for name in DEFAULT_PAGES {
+        let file = www.join(name);
+        if let Ok(text) = std::fs::read_to_string(&file) {
+            let updated = rebrand_text(&text);
+            if updated != text {
+                let _ = std::fs::write(&file, updated);
+            }
+        }
+    }
+    let _ = std::fs::write(marker, "");
 }
 
 fn copy_dir_recursive(from: &Path, to: &Path) -> std::io::Result<()> {
@@ -464,4 +509,16 @@ pub fn can_bind_privileged_ports() -> bool {
         .and_then(|s| s.trim().parse::<u16>().ok())
         .map(|p| p <= 80)
         .unwrap_or(false)
+}
+
+#[cfg(test)]
+mod rebrand_tests {
+    use super::rebrand_text;
+
+    #[test]
+    fn renames_only_bare_occurrences() {
+        assert_eq!(rebrand_text("<h1>DevStackBox - PHP</h1>"), "<h1>LinuxDevStackBox - PHP</h1>");
+        assert_eq!(rebrand_text("LinuxDevStackBox and DevStackBox"), "LinuxDevStackBox and LinuxDevStackBox");
+        assert_eq!(rebrand_text("no brand here"), "no brand here");
+    }
 }
