@@ -76,7 +76,8 @@ h2{font-size:clamp(1.7rem,3.4vw,2.4rem);margin:0 0 10px;text-align:center;letter
 .feat{background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:24px;transition:.2s}
 .feat:hover{transform:translateY(-3px);border-color:color-mix(in srgb,var(--accent) 60%,var(--line))}
 .feat h3{margin:12px 0 6px;font-size:1.08rem}.feat p{margin:0;color:var(--muted)}
-.ic{width:44px;height:44px;display:grid;place-items:center;border-radius:12px;background:linear-gradient(135deg,rgba(59,130,246,.25),rgba(34,211,238,.18));font-size:1.35rem}
+.ic{width:44px;height:44px;display:grid;place-items:center;border-radius:12px;background:linear-gradient(135deg,rgba(59,130,246,.25),rgba(34,211,238,.18));color:var(--accent)}
+.ic svg{display:block}
 
 /* install */
 .tabs{display:flex;gap:8px;flex-wrap:wrap;justify-content:center;margin-bottom:22px}
